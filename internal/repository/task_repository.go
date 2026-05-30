@@ -1,0 +1,111 @@
+package repository
+
+import (
+	"context"
+	"fmt"
+	"todo/internal/db/postgres"
+	"todo/internal/dto"
+	"todo/internal/models"
+
+	"github.com/google/uuid"
+)
+
+var _ TaskRepository = (*TaskRepositoryImpl)(nil)
+
+type TaskRepositoryImpl struct{}
+
+func NewTaskRepository() *TaskRepositoryImpl {
+	return &TaskRepositoryImpl{}
+}
+
+func (r *TaskRepositoryImpl) CreateTask(ctx context.Context, task *models.Task) error {
+	_, err := postgres.DB.Exec(ctx,
+		`INSERT INTO tasks (id, user_id, title, description, status, priority, deadline, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		task.ID, task.UserID, task.Title, task.Description, task.Status, task.Priority, task.DeadLine, task.CreatedAt, task.UpdatedAt)
+	return err
+}
+
+func (r *TaskRepositoryImpl) GetAllByUser(ctx context.Context, userID uuid.UUID) ([]models.Task, error) {
+	rows, err := postgres.DB.Query(ctx, `SELECT id, user_id, title, description, status, priority, deadline, created_at, updated_at
+		FROM tasks WHERE user_id = $1 ORDER BY created_at DESC`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tasks []models.Task
+	tasks = []models.Task{}
+	for rows.Next() {
+		var t models.Task
+		err := rows.Scan(&t.ID, &t.UserID, &t.Title, &t.Description, &t.Status, &t.Priority, &t.DeadLine, &t.CreatedAt, &t.UpdatedAt)
+		if err != nil {
+			continue
+		}
+		tasks = append(tasks, t)
+	}
+	return tasks, nil
+}
+
+func (r *TaskRepositoryImpl) GetTaskByID(ctx context.Context, taskID, userID uuid.UUID) (*models.Task, error) {
+	var task models.Task
+	err := postgres.DB.QueryRow(ctx,
+		`SELECT id, user_id, title, description, status, priority, deadline, created_at, updated_at FROM tasks WHERE id = $1 AND user_id = $2`,
+		taskID, userID).Scan(&task.ID, &task.UserID, &task.Title, &task.Description,
+		&task.Status, &task.Priority, &task.DeadLine, &task.CreatedAt, &task.UpdatedAt)
+
+	if err != nil {
+		return nil, err
+	}
+	return &task, nil
+}
+
+func (r *TaskRepositoryImpl) UpdateTask(ctx context.Context, taskID, userID uuid.UUID, req dto.UpdateTaskRequest) error {
+	query := "UPDATE tasks SET updated_at = NOW()"
+	var args []interface{}
+	argCount := 1
+
+	if req.Title != nil {
+		query += fmt.Sprintf(", title = $%d", argCount)
+		args = append(args, *req.Title)
+		argCount++
+	}
+	if req.Description != nil {
+		query += fmt.Sprintf(", description = $%d", argCount)
+		args = append(args, *req.Description)
+		argCount++
+	}
+	if req.Status != nil {
+		query += fmt.Sprintf(", status = $%d", argCount)
+		args = append(args, *req.Status)
+		argCount++
+	}
+	if req.Priority != nil {
+		query += fmt.Sprintf(", priority = $%d", argCount)
+		args = append(args, *req.Priority)
+		argCount++
+	}
+	if req.Deadline != nil {
+		query += fmt.Sprintf(", deadline = $%d", argCount)
+		args = append(args, *req.Deadline)
+		argCount++
+	}
+
+	query += fmt.Sprintf(" WHERE id = $%d AND user_id = $%d", argCount, argCount+1)
+	args = append(args, taskID, userID)
+
+	result, err := postgres.DB.Exec(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("Task not found or access denied")
+	}
+
+	return nil
+}
+
+func (r *TaskRepositoryImpl) DeleteTask(ctx context.Context, taskID, userID uuid.UUID) (int64, error) {
+	return postgres.ExecRowAffected(ctx, "DELETE FROM tasks WHERE id = $1 AND user_id = $2", taskID, userID)
+}

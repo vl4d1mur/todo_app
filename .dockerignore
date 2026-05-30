@@ -1,0 +1,6 @@
+# .dockerignore
+.git
+*.md
+*.exe
+token
+tmp/
