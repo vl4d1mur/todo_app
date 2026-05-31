@@ -91,7 +91,7 @@ func (s *TaskService) DeleteTask(ctx context.Context, taskID, userID uuid.UUID) 
 }
 
 func (s *TaskService) GetAllByUser(ctx context.Context, userID uuid.UUID) ([]models.Task, error) {
-	if tasks, err := redisConn.GetCachedTasksList(userID.String()); err != nil {
+	if tasks, err := redisConn.GetCachedTasksList(userID.String()); err == nil {
 		return tasks, nil
 	}
 
