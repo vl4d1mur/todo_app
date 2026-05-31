@@ -13,6 +13,6 @@ type Note struct {
 	AuthorID  uuid.UUID      `json:"author_id" bson:"author_id"`
 	Text      string         `json:"text" bson:"text"`
 	Meta      map[string]any `json:"meta" bson:"meta"`
-	CreatedAt time.Time      `json:"created_at" bson:"updated_at"`
+	CreatedAt time.Time      `json:"created_at" bson:"created_at"`
 }
 
