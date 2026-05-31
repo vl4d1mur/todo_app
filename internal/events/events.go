@@ -2,7 +2,6 @@ package events
 
 import (
 	"encoding/json"
-	//"log"
 	"time"
 
 	"todo/internal/config"
@@ -36,28 +35,23 @@ func ConnectNATS() {
 		nats.MaxReconnects(5),
 		nats.ReconnectWait(2*time.Second),
 		nats.DisconnectErrHandler(func(nc *nats.Conn, err error) {
-			//log.Println("NATS disconnected:", err)
 			log.Logger.Error().Err(err).Msg("NATS disconnected:")
 		}),
 		nats.ReconnectHandler(func(nc *nats.Conn) {
-			//log.Println("NATS reconnected to:", nc.ConnectedUrl())
 			log.Logger.Warn().Str("NATS reconnected to:", nc.ConnectedUrl())
 		}),
 	)
 	if err != nil {
-		//log.Fatal("NATS connection error:", err)
 		log.Logger.Fatal().Err(err).Msg("NATS connection error:")
 	}
 
 	NatsConn = conn
-	//log.Println("Connected to NATS")
 	log.Logger.Info().Msg("Connected to NATS")
 }
 
 func CloseNATS() {
 	if NatsConn != nil {
 		NatsConn.Drain()
-		//log.Println("NATS connection closed")
 		log.Logger.Info().Msg("NATS connection closed")
 	}
 }
@@ -73,7 +67,6 @@ func PublishTaskEvent(eventType string, taskID, userID uuid.UUID, payload any) {
 
 	data, err := json.Marshal(event)
 	if err != nil {
-		//log.Println("Event marshal error:", err)
 		log.Logger.Error().Err(err).Msg("Event marshal error:")
 		return
 	}
@@ -84,12 +77,10 @@ func PublishTaskEvent(eventType string, taskID, userID uuid.UUID, payload any) {
 	}
 
 	if err := NatsConn.Publish("task-events", data); err != nil {
-		//log.Println("NATS publish error:", err)
 		log.Logger.Error().Err(err).Msg("NATS publish error:")
 		return
 	}
 
-	//log.Printf("Event published: %s task:%s", eventType, taskID)
 	log.Logger.Info().
 		Str("event_type", eventType).
 		Str("task_id", taskID.String()).
