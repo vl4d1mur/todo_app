@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	ErrUserNotFound = errors.New("user not")
+	ErrUserNotFound = errors.New("user not found")
 	ErrUserAlrdeadyExists = errors.New("user with this email already exists")
 	ErrInvalidPassword = errors.New("invalid email or password")
 )
