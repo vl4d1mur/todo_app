@@ -5,14 +5,14 @@ import(
 )
 
 type RegisterRequest struct {
-	Email    string `json:"email" validate:"required, email"`
+	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required,min=6"`
-	Name     string `json:"name" validate:"required, min=2, max=50"`
+	Name     string `json:"name" validate:"required,min=2,max=50"`
 }
 
 type LoginRequest struct {
-	Email    string `json:"email" validate:"required, email"`
-	Password string `json:"password" validate:"required, password"`
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,password"`
 }
 
 type LoginResponse struct {
