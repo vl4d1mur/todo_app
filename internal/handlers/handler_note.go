@@ -18,6 +18,7 @@ func (h *NoteHandler) CreateNoteHandler(w http.ResponseWriter, r *http.Request) 
 	userID, ok := middleware.GetUserIDFromContext(r)
 	if !ok {
 		middleware.RespondWithError(w, http.StatusUnauthorized, "User unauthorized")
+		return
 	}
 
 	vars := mux.Vars(r)
