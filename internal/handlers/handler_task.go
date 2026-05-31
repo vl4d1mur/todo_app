@@ -14,7 +14,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-
 func (h *TaskHandler) CreateTaskHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserIDFromContext(r)
 	if !ok {

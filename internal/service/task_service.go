@@ -16,8 +16,8 @@ import (
 )
 
 var (
-	ErrTaskNotFound    = errors.New("task not found")
 	ErrInvalidTaskData = errors.New("invalid task data")
+	ErrTaskNotFound    = errors.New("task not found")
 )
 
 type TaskService struct {
@@ -57,7 +57,7 @@ func (s *TaskService) CreateTask(ctx context.Context, userID uuid.UUID, req dto.
 
 func (s *TaskService) UpdateTask(ctx context.Context, taskID, userID uuid.UUID, req dto.UpdateTaskRequest) (*models.Task, error) {
 	if err := s.repo.UpdateTask(ctx, taskID, userID, req); err != nil {
-		if err.Error() == "task not found or acces denied" {
+		if errors.Is(err, repository.ErrTaskNotFound) {
 			return nil, ErrTaskNotFound
 		}
 		return nil, fmt.Errorf("failed to update task: %w", err)

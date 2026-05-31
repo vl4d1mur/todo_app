@@ -12,8 +12,10 @@ import (
 
 type AuthServiceInterface interface {
     Register(ctx context.Context, req dto.RegisterRequest) (*models.User, error)
-    Login(ctx context.Context, req dto.LoginRequest) (string, *models.User, error)
+    Login(ctx context.Context, req dto.LoginRequest) (*dto.TokenPair, error)
     GetProfile(ctx context.Context, userID uuid.UUID) (*models.User, error)
+    RefreshToken(ctx context.Context, refreshToken string) (*dto.TokenPair, error)
+    Logout(ctx context.Context, refreshToken string) error
 }
 
 type TaskServiceInterface interface {

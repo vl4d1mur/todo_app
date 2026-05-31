@@ -1,14 +1,14 @@
 package jwt
 
-import(
+import (
 	"errors"
 	"time"
 
 	"todo/internal/config"
 	"todo/internal/models"
 
-	"github.com/google/uuid"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 var (
@@ -16,41 +16,59 @@ var (
 	ErrExpiredToken = errors.New("token expired")
 )
 
+const AccessTokenTTL = 15 * time.Minute
+const RefreshTokenTTL = 30 * 24 * time.Hour
+
 type Claims struct {
 	UserID uuid.UUID `json:"user_id"`
-	Email  string    `json:"email"`
 	jwt.RegisteredClaims
 }
 
-func GenerateJWT(user models.User) (string, error) {
+func GenerateAccess(user models.User) (string, error) {
+	return generateToken(user.ID, AccessTokenTTL, config.JwtSecret)
+}
+
+func GenerateRefresh(user models.User) (string, error) {
+	return generateToken(user.ID, RefreshTokenTTL, config.JwtRefreshSecret)
+}
+
+func ParseAccess(tokenString string) (*Claims, error) {
+	return parseToken(tokenString, config.JwtSecret)
+}
+
+func ParseRefresh(tokenString string) (*Claims, error) {
+	return parseToken(tokenString, config.JwtRefreshSecret)
+}
+
+func generateToken(userID uuid.UUID, ttl time.Duration, secret []byte) (string, error) {
 	claims := Claims{
-		UserID: user.ID,
-		Email:  user.Email,
+		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			ID:        uuid.New().String(),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(ttl)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(config.JwtSecret)
+	return token.SignedString(secret)
 }
 
-func ParseJWT(tokenString string) (*Claims, error) {
+func parseToken(tokenString string, secret []byte) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, ErrInvalidToken
 		}
-		return config.JwtSecret, nil
+		return secret, nil
 	})
 
 	if err != nil {
-		if errors.Is(err, jwt.ErrTokenExpired){
+		if errors.Is(err, jwt.ErrTokenExpired) {
 			return nil, ErrExpiredToken
 		}
 		return nil, ErrInvalidToken
 	}
 
-	claims, ok := token.Claims.(*Claims); 
+	claims, ok := token.Claims.(*Claims)
 	if !ok || !token.Valid {
 		return nil, ErrInvalidToken
 	}

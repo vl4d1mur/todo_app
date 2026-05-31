@@ -30,3 +30,10 @@ type NoteRepository interface {
     DeleteNote(ctx context.Context, noteID bson.ObjectID, userID uuid.UUID) error
     GetAllByTask(ctx context.Context, taskID uuid.UUID) ([]models.Note, error)
 }
+
+type SessionRepository interface {
+    CreateSession(ctx context.Context, session *models.Session) error
+    GetSessionByToken(ctx context.Context, refreshToken string) (*models.Session, error)
+    DeleteSessionByToken(ctx context.Context, refreshToken string) error
+    DeleteAllSessionsByUser(ctx context.Context, userID uuid.UUID) error
+}

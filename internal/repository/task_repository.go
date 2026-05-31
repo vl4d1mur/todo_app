@@ -3,14 +3,19 @@ package repository
 import (
 	"context"
 	"fmt"
+	"errors"
+	
 	"todo/internal/db/postgres"
 	"todo/internal/dto"
 	"todo/internal/models"
+	"todo/pkg/log"
 
 	"github.com/google/uuid"
 )
 
 var _ TaskRepository = (*TaskRepositoryImpl)(nil)
+
+var ErrTaskNotFound = errors.New("task not found or access denied")
 
 type TaskRepositoryImpl struct{}
 
@@ -40,6 +45,7 @@ func (r *TaskRepositoryImpl) GetAllByUser(ctx context.Context, userID uuid.UUID)
 		var t models.Task
 		err := rows.Scan(&t.ID, &t.UserID, &t.Title, &t.Description, &t.Status, &t.Priority, &t.DeadLine, &t.CreatedAt, &t.UpdatedAt)
 		if err != nil {
+			log.Logger.Warn().Err(err).Msg("Failed to scan task row")
 			continue
 		}
 		tasks = append(tasks, t)
@@ -100,7 +106,7 @@ func (r *TaskRepositoryImpl) UpdateTask(ctx context.Context, taskID, userID uuid
 	}
 
 	if result.RowsAffected() == 0 {
-		return fmt.Errorf("Task not found or access denied")
+		return ErrTaskNotFound
 	}
 
 	return nil

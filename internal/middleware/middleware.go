@@ -45,7 +45,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 
 		tokenString := parts[1]
 
-		claims, err := jwt.ParseJWT(tokenString)
+		claims, err := jwt.ParseAccess(tokenString)
 		if err != nil {
 			switch err {
 			case jwt.ErrExpiredToken:
@@ -57,8 +57,6 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		ctx := context.WithValue(r.Context(), contextKeyUserID, claims.UserID)
-		ctx = context.WithValue(ctx, contextKeyEmail, claims.Email)
-
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

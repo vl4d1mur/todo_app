@@ -32,8 +32,9 @@ func main() {
     userRepo := repository.NewUserRepository()
     taskRepo := repository.NewTaskRepository()
     noteRepo := repository.NewNoteRepository()
+	sessionRepo := repository.NewSessionRepository()
 
-    authSvc := service.NewAuthService(userRepo)
+    authSvc := service.NewAuthService(userRepo, sessionRepo)
     taskSvc := service.NewTaskService(taskRepo)
     noteSvc := service.NewNoteService(noteRepo)
 

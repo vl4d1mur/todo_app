@@ -20,6 +20,7 @@ var (
 	PostgresDSN   string
 	AppEnv        string
 	JwtSecret     []byte
+	JwtRefreshSecret []byte
 	MongoUri      string
 	MongoDbName   string
 	MongoDbCollection string
@@ -36,6 +37,7 @@ func LoadConfig() {
 	ServerPort = getEnv("SERVER_PORT", ":8090")
 	PostgresDSN = getEnv("POSTGRES_DSN", "postgres://postgres:root@localhost:5432/todo_app")
 	JwtSecret = []byte(getEnv("JWT_SECRET", "abeba229"))
+	JwtRefreshSecret = []byte(getEnv("JWT_REFRESH_SECRET", "eriolergjiergjilohuio2347890"))
 	AppEnv = getEnv("APP_ENV", "development")
 	MongoUri = getEnv("MONGO_URI", "mongodb://127.0.0.1:27017")
 	MongoDbName = getEnv("MONGO_DB_NAME", "todo_notes")

@@ -19,3 +19,7 @@ type LoginResponse struct {
 	Token string `json:"token"`
 	User  models.User   `json:"user"`
 }
+
+type RefreshRequest struct {
+    RefreshToken string `json:"refresh_token"`
+}

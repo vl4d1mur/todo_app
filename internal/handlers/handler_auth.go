@@ -11,12 +11,9 @@ import (
 	"todo/pkg/log"
 )
 
-
-
 func (h *AuthHandler) GetProfileHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserIDFromContext(r)
 	if !ok {
-		log.Logger.Info().Msg(userID.String())
 		middleware.RespondWithError(w, http.StatusUnauthorized, "User unauthorized")
 		return
 	}
@@ -69,7 +66,7 @@ func (h *AuthHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, user, err := h.service.Login(r.Context(), req)
+	tokens, err := h.service.Login(r.Context(), req)
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidPassword) {
 			middleware.RespondWithError(w, http.StatusUnauthorized, "Invalid email or password")
@@ -80,8 +77,59 @@ func (h *AuthHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	middleware.RespondWithJSON(w, http.StatusOK, dto.LoginResponse{
-		Token: token,
-		User:  *user,
+	middleware.RespondWithJSON(w, http.StatusOK, tokens)
+}
+
+func (h *AuthHandler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
+	var req dto.RefreshRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		middleware.RespondWithError(w, http.StatusBadRequest, "Invalid data format")
+		return
+	}
+
+	if req.RefreshToken == "" {
+		middleware.RespondWithError(w, http.StatusBadRequest, "Refresh token is required")
+		return
+	}
+
+	tokens, err := h.service.RefreshToken(r.Context(), req.RefreshToken)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidSession) {
+			middleware.RespondWithError(w, http.StatusUnauthorized, "Invalid or expired refresh token")
+		} else {
+			log.Logger.Error().Err(err).Msg("Refresh error")
+			middleware.RespondWithError(w, http.StatusInternalServerError, "Refresh failed")
+		}
+		return
+	}
+
+	middleware.RespondWithJSON(w, http.StatusOK, tokens)
+}
+
+func (h *AuthHandler) LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	var req dto.RefreshRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Logger.Error().Err(err).Msg("Logout decode error")
+		middleware.RespondWithError(w, http.StatusBadRequest, "Invalid data format")
+		return
+	}
+
+	if req.RefreshToken == "" {
+		middleware.RespondWithError(w, http.StatusBadRequest, "Refresh token is required")
+		return
+	}
+
+	if err := h.service.Logout(r.Context(), req.RefreshToken); err != nil {
+		if errors.Is(err, service.ErrInvalidSession) {
+			middleware.RespondWithError(w, http.StatusUnauthorized, "Invalid or expired refresh token")
+		} else {
+			log.Logger.Error().Err(err).Msg("Logout error")
+			middleware.RespondWithError(w, http.StatusInternalServerError, "Logout failed")
+		}
+		return
+	}
+
+	middleware.RespondWithJSON(w, http.StatusOK, dto.SuccessResponse{
+		Message: "Logged out successfully",
 	})
 }
