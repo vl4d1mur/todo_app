@@ -1,51 +1,23 @@
-# Примеры PowerShell запросов
+# Todo App — Этап 1
 
-## Auth
+## Стек
 
-# Регистрация
-Invoke-RestMethod -Method POST -Uri http://localhost:8090/api/register -Headers @{"Content-Type"="application/json"} -Body '{"name":"John Doe","email":"john@example.com","password":"password123"}'
-
-# Логин (token)
-Invoke-RestMethod -Method POST -Uri http://localhost:8090/api/login -Headers @{"Content-Type"="application/json"} -Body '{"email":"john@example.com","password":"password123"}'
-
-# Профиль пользователя
-Invoke-RestMethod -Method GET -Uri http://localhost:8090/api/profile -Headers @{"Authorization"="Bearer <TOKEN>"}
-
-## Tasks
-
-# Создать задачу
-Invoke-RestMethod -Method POST -Uri http://localhost:8090/api/tasks -Headers @{"Content-Type"="application/json"; "Authorization"="Bearer <TOKEN>"} -Body '{"title":"Купить молоко","description":"Обязательно 3.5%","status":"todo","priority":2,"deadline":"2026-06-01T12:00:00Z"}'
-
-# Получить все задачи пользователя
-Invoke-RestMethod -Method GET -Uri http://localhost:8090/api/tasks -Headers @{"Authorization"="Bearer <TOKEN>"}
-
-# Получить задачу по ID
-Invoke-RestMethod -Method GET -Uri http://localhost:8090/api/tasks/<TASK_ID> -Headers @{"Authorization"="Bearer <TOKEN>"}
-
-# Обновить задачу
-Invoke-RestMethod -Method PATCH -Uri http://localhost:8090/api/tasks/<TASK_ID> -Headers @{"Content-Type"="application/json"; "Authorization"="Bearer <TOKEN>"} -Body '{"title":"Buy milk22","status":"in_progress"}'
-
-# Удалить задачу
-Invoke-RestMethod -Method DELETE -Uri http://localhost:8090/api/tasks/<TASK_ID> -Headers @{"Authorization"="Bearer <TOKEN>"}
-
-
-## Notes
-
-# Создать заметку к задаче
-Invoke-RestMethod -Method POST -Uri http://localhost:8090/api/tasks/<TASK_ID>/notes -Headers @{"Content-Type"="application/json"; "Authorization"="Bearer <TOKEN>"} -Body '{"text":"Это тестовая заметка","meta":{"color":"red","pinned":true}}'
-
-# Получить все заметки задачи
-Invoke-RestMethod -Method GET -Uri http://localhost:8090/api/tasks/<TASK_ID>/notes -Headers @{"Authorization"="Bearer <TOKEN>"}
-
-# Удалить заметку
-Invoke-RestMethod -Method DELETE -Uri http://localhost:8090/api/notes/<NOTE_ID> -Headers @{"Authorization"="Bearer <TOKEN>"}
+| Компонент  | Назначение                        |
+|------------|-----------------------------------|
+| Go         | Язык                              |
+| PostgreSQL | Пользователи, задачи, сессии      |
+| MongoDB    | Заметки к задачам                 |
+| Redis      | Кэш списка задач и профиля        |
+| NATS       | Брокер событий по задачам         |
+| Docker     | Запуск всего окружения            |
 
 ---
 
-# Примеры Curl запросов
+## API
 
-## Auth
+### Auth
 
+```bash
 # Регистрация
 curl -X POST http://localhost:8090/api/register \
   -H "Content-Type: application/json" \
@@ -56,48 +28,74 @@ curl -X POST http://localhost:8090/api/login \
   -H "Content-Type: application/json" \
   -d '{"email":"john@example.com","password":"password123"}'
 
-# Профиль пользователя
+# Обновить токены
+curl -X POST http://localhost:8090/api/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refresh_token":"<REFRESH_TOKEN>"}'
+
+# Логаут
+curl -X POST http://localhost:8090/api/logout \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"refresh_token":"<REFRESH_TOKEN>"}'
+
+# Профиль
 curl -X GET http://localhost:8090/api/profile \
   -H "Authorization: Bearer <TOKEN>"
+```
 
-# Tasks
+### Tasks
 
+```bash
 # Создать задачу
 curl -X POST http://localhost:8090/api/tasks \
-  -H "Content-Type: application/json" \
   -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
   -d '{"title":"Купить молоко","description":"Обязательно 3.5%","status":"todo","priority":2,"deadline":"2026-06-01T12:00:00Z"}'
 
-# Получить все задачи
-curl -X GET http://localhost:8090/api/tasks \
+# Список задач (пагинация + фильтр по статусу)
+curl -X GET "http://localhost:8090/api/tasks?page=1&limit=10&status=todo" \
   -H "Authorization: Bearer <TOKEN>"
 
-# Получить задачу по ID
+# Получить задачу с заметками
 curl -X GET http://localhost:8090/api/tasks/<TASK_ID> \
   -H "Authorization: Bearer <TOKEN>"
 
 # Обновить задачу
 curl -X PATCH http://localhost:8090/api/tasks/<TASK_ID> \
-  -H "Content-Type: application/json" \
   -H "Authorization: Bearer <TOKEN>" \
-  -d '{"title":"Buy milk22","status":"in_progress"}'
+  -H "Content-Type: application/json" \
+  -d '{"title":"Buy milk","status":"in_progress"}'
 
 # Удалить задачу
 curl -X DELETE http://localhost:8090/api/tasks/<TASK_ID> \
   -H "Authorization: Bearer <TOKEN>"
+```
 
-# Notes
+### Notes
 
-# Создать заметку к задаче
+```bash
+# Создать заметку
 curl -X POST http://localhost:8090/api/tasks/<TASK_ID>/notes \
-  -H "Content-Type: application/json" \
   -H "Authorization: Bearer <TOKEN>" \
-  -d '{"text":"Это тестовая заметка","meta":{"color":"red","pinned":true}}'
+  -H "Content-Type: application/json" \
+  -d '{"text":"Тестовая заметка","meta":{"color":"red","pinned":true}}'
 
-# Получить все заметки задачи
+# Список заметок задачи
 curl -X GET http://localhost:8090/api/tasks/<TASK_ID>/notes \
   -H "Authorization: Bearer <TOKEN>"
 
 # Удалить заметку
 curl -X DELETE http://localhost:8090/api/notes/<NOTE_ID> \
   -H "Authorization: Bearer <TOKEN>"
+```
+
+### Health
+
+```bash
+# Liveness
+curl http://localhost:8090/healthz
+
+# Readiness
+curl http://localhost:8090/readyz
+```

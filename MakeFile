@@ -1,0 +1,16 @@
+DB_URL=postgres://postgres:root@localhost:5432/todo_app
+MIGRATIONS_DIR=migrations
+
+.PHONY: migrate-up migrate-down migrate-status migrate-create
+
+migrate-up:
+	goose -dir $(MIGRATIONS_DIR) postgres "$(DB_URL)" up
+
+migrate-down:
+	goose -dir $(MIGRATIONS_DIR) postgres "$(DB_URL)" down
+
+migrate-status:
+	goose -dir $(MIGRATIONS_DIR) postgres "$(DB_URL)" status
+
+migrate-create:
+	goose -dir $(MIGRATIONS_DIR) create $(name) sql

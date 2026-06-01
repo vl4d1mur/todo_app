@@ -5,6 +5,7 @@ import (
 
     "todo/internal/dto"
     "todo/internal/models"
+    "todo/pkg/pagination"
 
     "github.com/google/uuid"
     "go.mongodb.org/mongo-driver/v2/bson"
@@ -22,7 +23,7 @@ type TaskServiceInterface interface {
     CreateTask(ctx context.Context, userID uuid.UUID, req dto.CreateTaskRequest) (*models.Task, error)
     UpdateTask(ctx context.Context, taskID, userID uuid.UUID, req dto.UpdateTaskRequest) (*models.Task, error)
     DeleteTask(ctx context.Context, taskID, userID uuid.UUID) error
-    GetAllByUser(ctx context.Context, userID uuid.UUID) ([]models.Task, error)
+    GetAllByUser(ctx context.Context, userID uuid.UUID, q pagination.Query) ([]models.Task, int64, error)
     GetTaskByID(ctx context.Context, taskID, userID uuid.UUID) (*models.Task, error)
 }
 

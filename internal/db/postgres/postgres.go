@@ -48,11 +48,3 @@ func ClosePostgres() {
 func GetDB() *pgxpool.Pool {
 	return DB
 }
-
-func ExecRowAffected(ctx context.Context, query string, args ...interface{}) (int64, error) {
-    ct, err := DB.Exec(ctx, query, args...)
-    if err != nil {
-        return 0, err
-    }
-    return ct.RowsAffected(), nil
-}

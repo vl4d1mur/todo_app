@@ -16,6 +16,7 @@ type AuthHandler struct {
 
 type TaskHandler struct {
     service service.TaskServiceInterface
+    noteService service.NoteServiceInterface
 }
 
 type NoteHandler struct {
@@ -29,7 +30,7 @@ func NewHandler(
 ) *Handler {
     return &Handler{
         Auth: &AuthHandler{service: authSvc},
-        Task: &TaskHandler{service: taskSvc},
+        Task: &TaskHandler{service: taskSvc, noteService: noteSvc},
         Note: &NoteHandler{service: noteSvc},
     }
 }

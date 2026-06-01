@@ -22,7 +22,7 @@ type TaskRepository interface {
     GetAllByUser(ctx context.Context, userID uuid.UUID) ([]models.Task, error)
     GetTaskByID(ctx context.Context, taskID, userID uuid.UUID) (*models.Task, error)
     UpdateTask(ctx context.Context, taskID, userID uuid.UUID, req dto.UpdateTaskRequest) error
-    DeleteTask(ctx context.Context, taskID, userID uuid.UUID) (int64, error)
+    DeleteTask(ctx context.Context, taskID, userID uuid.UUID) error
 }
 
 type NoteRepository interface {

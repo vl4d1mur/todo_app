@@ -17,6 +17,7 @@ import (
 	"todo/internal/db/redisConn"
 	"todo/internal/events"
 	"todo/internal/routes"
+	"todo/internal/health"
 	"todo/pkg/log"
 )
 
@@ -39,7 +40,15 @@ func main() {
     noteSvc := service.NewNoteService(noteRepo)
 
     h := handlers.NewHandler(authSvc, taskSvc, noteSvc)
-    router := routes.SetupRoutes(h)
+    
+	healthChecker := health.NewChecker(
+    postgres.DB,
+    redisConn.RedisClient,
+    mongo.MongoDB,
+    events.NatsConn,
+	)
+	
+	router := routes.SetupRoutes(h, healthChecker)
 	
 	log.Logger.Info().Msg("Starting server")
 	srv := &http.Server{

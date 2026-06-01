@@ -11,6 +11,7 @@ import (
 	"todo/internal/events"
 	"todo/internal/models"
 	"todo/internal/repository"
+	"todo/pkg/pagination"
 
 	"github.com/google/uuid"
 )
@@ -18,6 +19,8 @@ import (
 var (
 	ErrInvalidTaskData = errors.New("invalid task data")
 	ErrTaskNotFound    = errors.New("task not found")
+	ErrInvalidStatus = errors.New("invalid status")
+	ErrTaskAccessDenied = errors.New("access denied")
 )
 
 type TaskService struct {
@@ -56,11 +59,12 @@ func (s *TaskService) CreateTask(ctx context.Context, userID uuid.UUID, req dto.
 }
 
 func (s *TaskService) UpdateTask(ctx context.Context, taskID, userID uuid.UUID, req dto.UpdateTaskRequest) (*models.Task, error) {
-	if err := s.repo.UpdateTask(ctx, taskID, userID, req); err != nil {
-		if errors.Is(err, repository.ErrTaskNotFound) {
-			return nil, ErrTaskNotFound
+	err := s.repo.UpdateTask(ctx, taskID, userID, req) 
+	if err != nil {
+		if errors.Is(err, repository.ErrTaskAccessDenied) {
+			return nil, ErrTaskAccessDenied
 		}
-		return nil, fmt.Errorf("failed to update task: %w", err)
+		return nil, ErrTaskNotFound
 	}
 
 	redisConn.InvalidateTasksCache(userID.String())
@@ -71,26 +75,30 @@ func (s *TaskService) UpdateTask(ctx context.Context, taskID, userID uuid.UUID, 
 		})
 	}
 
-	return s.repo.GetTaskByID(ctx, taskID, userID)
+	task, err := s.repo.GetTaskByID(ctx, taskID, userID)
+	if err != nil {
+    	return nil, fmt.Errorf("failed to get updated task: %w", err)
+	}
+	
+	return task, nil
 }
 
 func (s *TaskService) DeleteTask(ctx context.Context, taskID, userID uuid.UUID) error {
-	rowsAffected, err := s.repo.DeleteTask(ctx, taskID, userID)
+	err := s.repo.DeleteTask(ctx, taskID, userID)
 	if err != nil {
-		return fmt.Errorf("failed to delete task: %w", err)
-	}
-
-	if rowsAffected == 0 {
+		if errors.Is(err, repository.ErrTaskAccessDenied) {
+			return ErrTaskAccessDenied
+		}
 		return ErrTaskNotFound
 	}
-
+	
 	redisConn.InvalidateTasksCache(userID.String())
 	events.PublishTaskEvent(events.EventTaskDeleted, taskID, userID, nil)
 
 	return nil
 }
 
-func (s *TaskService) GetAllByUser(ctx context.Context, userID uuid.UUID) ([]models.Task, error) {
+/*func (s *TaskService) GetAllByUser(ctx context.Context, userID uuid.UUID) ([]models.Task, error) {
 	if tasks, err := redisConn.GetCachedTasksList(userID.String()); err == nil {
 		return tasks, nil
 	}
@@ -102,8 +110,60 @@ func (s *TaskService) GetAllByUser(ctx context.Context, userID uuid.UUID) ([]mod
 
 	redisConn.CacheTasksList(userID.String(), tasks)
 	return tasks, nil
-}
+} */
 
 func (s *TaskService) GetTaskByID(ctx context.Context, taskID, userID uuid.UUID) (*models.Task, error) {
-	return s.repo.GetTaskByID(ctx, taskID, userID)
+	task, err := s.repo.GetTaskByID(ctx, taskID, userID)
+	if err != nil {
+		if errors.Is(err, repository.ErrTaskAccessDenied) {
+			return nil, ErrTaskAccessDenied
+		}
+		return nil, ErrTaskNotFound
+	}
+	return task, nil
+}
+
+func (s *TaskService) GetAllByUser(ctx context.Context, userID uuid.UUID, q pagination.Query) ([]models.Task, int64, error) {
+    q = pagination.NewPaginationQuery(q.Page, q.Limit, q.Status)
+
+    allTasks, err := redisConn.GetCachedTasksList(userID.String())
+    if err != nil {
+        allTasks, err = s.repo.GetAllByUser(ctx, userID)
+        if err != nil {
+            return nil, 0, fmt.Errorf("failed to get tasks: %w", err)
+        }
+        redisConn.CacheTasksList(userID.String(), allTasks)
+    }
+
+	if q.Status != "" {
+    	switch models.TaskStatus(q.Status) {
+    	case models.TaskStatusTodo, models.TaskStatusInProgress, models.TaskStatusDone:
+    	
+		default:
+        return nil, 0, ErrInvalidStatus
+    	}
+	}
+	
+    if q.Status != "" {
+        filtered := []models.Task{}
+        for _, t := range allTasks {
+            if string(t.Status) == q.Status {
+                filtered = append(filtered, t)
+            }
+        }
+        allTasks = filtered
+    }
+
+    total := int64(len(allTasks))
+    start := (q.Page - 1) * q.Limit
+    end := start + q.Limit
+
+    if start >= int(total) {
+        return []models.Task{}, total, nil
+    }
+    if end > int(total) {
+        end = int(total)
+    }
+
+    return allTasks[start:end], total, nil
 }

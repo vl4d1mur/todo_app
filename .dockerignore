@@ -1,6 +1,9 @@
-# .dockerignore
 .git
 *.md
 *.exe
 token
 tmp/
+tests/
+*.zip
+.env
+.gitignore

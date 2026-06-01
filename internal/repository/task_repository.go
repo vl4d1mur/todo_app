@@ -2,20 +2,24 @@ package repository
 
 import (
 	"context"
-	"fmt"
 	"errors"
-	
+	"fmt"
+
 	"todo/internal/db/postgres"
 	"todo/internal/dto"
 	"todo/internal/models"
 	"todo/pkg/log"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 var _ TaskRepository = (*TaskRepositoryImpl)(nil)
 
-var ErrTaskNotFound = errors.New("task not found or access denied")
+var (
+	ErrTaskNotFound = errors.New("task not found or access denied")
+	ErrTaskAccessDenied = errors.New("access to task denied")
+)
 
 type TaskRepositoryImpl struct{}
 
@@ -61,12 +65,36 @@ func (r *TaskRepositoryImpl) GetTaskByID(ctx context.Context, taskID, userID uui
 		&task.Status, &task.Priority, &task.DeadLine, &task.CreatedAt, &task.UpdatedAt)
 
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows){
+			return nil, ErrTaskNotFound
+		}
 		return nil, err
 	}
+
+	if task.UserID != userID {
+		return nil, ErrTaskAccessDenied
+	}
+
 	return &task, nil
 }
 
 func (r *TaskRepositoryImpl) UpdateTask(ctx context.Context, taskID, userID uuid.UUID, req dto.UpdateTaskRequest) error {
+	
+	var ownerID uuid.UUID
+	err := postgres.DB.QueryRow(ctx,
+	`SELECT user_id FROM tasks WHERE id = $1`, taskID).Scan(&ownerID)
+	
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrTaskNotFound
+		}
+		return err
+	}
+
+	if ownerID != userID {
+		return ErrTaskAccessDenied
+	}
+
 	query := "UPDATE tasks SET updated_at = NOW()"
 	var args []interface{}
 	argCount := 1
@@ -97,21 +125,30 @@ func (r *TaskRepositoryImpl) UpdateTask(ctx context.Context, taskID, userID uuid
 		argCount++
 	}
 
-	query += fmt.Sprintf(" WHERE id = $%d AND user_id = $%d", argCount, argCount+1)
-	args = append(args, taskID, userID)
+	query += fmt.Sprintf(" WHERE id = $%d", argCount)
+	args = append(args, taskID)
 
-	result, err := postgres.DB.Exec(ctx, query, args...)
+	_, err = postgres.DB.Exec(ctx, query, args...)
+	return err
+}
+
+func (r *TaskRepositoryImpl) DeleteTask(ctx context.Context, taskID, userID uuid.UUID) error {
+	var ownerID uuid.UUID
+	err := postgres.DB.QueryRow(ctx, `
+	SELECT user_id FROM tasks WHERE id = $1`, taskID).Scan(&ownerID)
+
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrTaskNotFound
+		}
 		return err
 	}
 
-	if result.RowsAffected() == 0 {
-		return ErrTaskNotFound
+	if ownerID != userID {
+		return ErrTaskAccessDenied
 	}
+	
+	_, err = postgres.DB.Exec(ctx, "DELETE FROM tasks WHERE id = $1", taskID)
 
-	return nil
-}
-
-func (r *TaskRepositoryImpl) DeleteTask(ctx context.Context, taskID, userID uuid.UUID) (int64, error) {
-	return postgres.ExecRowAffected(ctx, "DELETE FROM tasks WHERE id = $1 AND user_id = $2", taskID, userID)
+	return err
 }
