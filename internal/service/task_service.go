@@ -91,26 +91,12 @@ func (s *TaskService) DeleteTask(ctx context.Context, taskID, userID uuid.UUID) 
 		}
 		return ErrTaskNotFound
 	}
-	
+
 	redisConn.InvalidateTasksCache(userID.String())
 	events.PublishTaskEvent(events.EventTaskDeleted, taskID, userID, nil)
 
 	return nil
 }
-
-/*func (s *TaskService) GetAllByUser(ctx context.Context, userID uuid.UUID) ([]models.Task, error) {
-	if tasks, err := redisConn.GetCachedTasksList(userID.String()); err == nil {
-		return tasks, nil
-	}
-
-	tasks, err := s.repo.GetAllByUser(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-
-	redisConn.CacheTasksList(userID.String(), tasks)
-	return tasks, nil
-} */
 
 func (s *TaskService) GetTaskByID(ctx context.Context, taskID, userID uuid.UUID) (*models.Task, error) {
 	task, err := s.repo.GetTaskByID(ctx, taskID, userID)
