@@ -1,0 +1,12 @@
+.git
+*.md
+*.exe
+token
+tmp/
+auth_service/tests/
+task_service/tests/
+task_service/cmd/consumer/
+config/
+*.zip
+.env
+.gitignore
