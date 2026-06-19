@@ -6,6 +6,7 @@ option go_package = "auth_service/pkg/pb;pb";
 
 service AuthService {
   rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+  rpc GetUserEmail(GetUserEmailRequest) returns (GetUserEmailResponse);
 }
 
 message ValidateTokenRequest {
@@ -16,4 +17,13 @@ message ValidateTokenResponse {
   bool valid = 1;
   string user_id = 2;
   string error = 3;
+}
+
+message GetUserEmailRequest {
+  string user_id = 1;
+}
+
+message GetUserEmailResponse {
+  string email = 1;
+  string error = 2;
 }

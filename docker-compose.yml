@@ -111,6 +111,32 @@ services:
       timeout: 5s
       retries: 5
 
+  notifier_service:
+    build: ./notifier_service
+    container_name: notifier_service
+    env_file:
+      - ./notifier_service/config/.env.example
+    ports:
+      - "8092:8092"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+      auth_service:
+        condition: service_started
+    restart: unless-stopped
+
+  mailhog:
+    image: mailhog/mailhog
+    container_name: mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    restart: unless-stopped
+
   # Infr
   mongo:
     image: mongo:7

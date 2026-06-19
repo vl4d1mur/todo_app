@@ -9,51 +9,55 @@ import (
 	"time"
 
 	"task_service/internal/config"
+	"task_service/internal/cron"
 	"task_service/internal/db/mongo"
 	"task_service/internal/db/postgres"
-	"task_service/internal/repository"
-	"task_service/internal/service"
-	"task_service/internal/handlers"
 	"task_service/internal/db/redisConn"
 	"task_service/internal/events"
-	"task_service/internal/routes"
-	"task_service/internal/health"
-	"task_service/pkg/log"
 	authgrpc "task_service/internal/grpc"
+	"task_service/internal/handlers"
+	"task_service/internal/health"
+	"task_service/internal/repository"
+	"task_service/internal/routes"
+	"task_service/internal/service"
+	"task_service/pkg/log"
 )
 
 func main() {
 	log.InitLogger()
-    config.LoadConfig()
+	config.LoadConfig()
 
-    redisConn.ConnectRedis()
-    postgres.ConnectPostgres()
-    mongo.ConnectMongo()
-    events.ConnectNATS()
+	redisConn.ConnectRedis()
+	postgres.ConnectPostgres()
+	mongo.ConnectMongo()
+	events.ConnectNATS()
 
-    taskRepo := repository.NewTaskRepository()
-    noteRepo := repository.NewNoteRepository()
+	taskRepo := repository.NewTaskRepository()
+	noteRepo := repository.NewNoteRepository()
 
-    taskSvc := service.NewTaskService(taskRepo)
-    noteSvc := service.NewNoteService(noteRepo)
+	deadlineChecker := cron.NewDeadlineChecker(taskRepo, 1*time.Minute)
+	deadlineChecker.Start()
 
-    h := handlers.NewHandler(taskSvc, noteSvc)
-    
+	taskSvc := service.NewTaskService(taskRepo)
+	noteSvc := service.NewNoteService(noteRepo)
+
+	h := handlers.NewHandler(taskSvc, noteSvc)
+
 	healthChecker := health.NewChecker(
-    postgres.DB,
-    redisConn.RedisClient,
-    mongo.MongoDB,
-    events.NatsConn,
+		postgres.DB,
+		redisConn.RedisClient,
+		mongo.MongoDB,
+		events.NatsConn,
 	)
-	
+
 	authClient, err := authgrpc.NewAuthClient(config.AuthGrpcAddr)
 	if err != nil {
-	log.Logger.Fatal().Err(err).Msg("Failed to connect to auth_service")
+		log.Logger.Fatal().Err(err).Msg("Failed to connect to auth_service")
 	}
 	defer authClient.Close()
 
 	router := routes.SetupRoutes(h, healthChecker, authClient)
-	
+
 	log.Logger.Info().Msg("Starting server")
 	srv := &http.Server{
 		Addr:    config.ServerPort,
@@ -87,6 +91,7 @@ func main() {
 	}
 	log.Logger.Info().Msg("HTTP server stoped")
 
+	deadlineChecker.Stop()
 	postgres.ClosePostgres()
 	redisConn.CloseRedis()
 	mongo.CloseMongoDB()

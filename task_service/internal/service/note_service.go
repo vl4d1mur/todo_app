@@ -39,10 +39,7 @@ func (s *NoteService) CreateNote(ctx context.Context, taskID, userID uuid.UUID, 
 		return nil, fmt.Errorf("failed to create note: %w", err)
 	}
 
-	events.PublishTaskEvent(events.EventNoteAdded, taskID, userID, map[string]any{
-		"note_id": note.ID.Hex(),
-		"text":    note.Text,
-	})
+	events.PublishNoteAdded(taskID, userID, note.ID.Hex(), note.Text)
 	
 	return &note, nil
 }

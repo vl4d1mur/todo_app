@@ -11,6 +11,7 @@ import (
 	"task_service/internal/service"
 	"task_service/pkg/log"
 	"task_service/pkg/pagination"
+	"task_service/pkg/validator"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -26,6 +27,11 @@ func (h *TaskHandler) CreateTaskHandler(w http.ResponseWriter, r *http.Request) 
 	var req dto.CreateTaskRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		middleware.RespondWithError(w, http.StatusBadRequest, "Invalid data format")
+		return
+	}
+
+	if err := validator.Validate(req); err != nil {
+		middleware.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -58,6 +64,11 @@ func (h *TaskHandler) UpdateTaskHandler(w http.ResponseWriter, r *http.Request) 
 	var req dto.UpdateTaskRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		middleware.RespondWithError(w, http.StatusBadRequest, "Invalid data format")
+		return
+	}
+
+	if err := validator.Validate(req); err != nil {
+		middleware.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -125,13 +136,13 @@ func (h *TaskHandler) GetAllTasks(w http.ResponseWriter, r *http.Request) {
 
 	tasks, total, err := h.service.GetAllByUser(r.Context(), userID, q)
 	if err != nil {
-		if errors.Is(err, service.ErrInvalidStatus){
+		if errors.Is(err, service.ErrInvalidStatus) {
 			middleware.RespondWithError(w, http.StatusBadRequest, "Invalid task status")
-		} else{
-		log.Logger.Error().Err(err).Msg("Getting tasks error:")
-		middleware.RespondWithError(w, http.StatusInternalServerError, "Get tasks failed")
+		} else {
+			log.Logger.Error().Err(err).Msg("Getting tasks error:")
+			middleware.RespondWithError(w, http.StatusInternalServerError, "Get tasks failed")
 		}
-		
+
 		return
 	}
 
@@ -155,12 +166,12 @@ func (h *TaskHandler) GetTaskByID(w http.ResponseWriter, r *http.Request) {
 	task, err := h.service.GetTaskByID(r.Context(), taskID, userID)
 	if err != nil {
 		if errors.Is(err, service.ErrTaskAccessDenied) {
-			middleware.RespondWithError(w, http.StatusForbidden, "Acces denied")
+			middleware.RespondWithError(w, http.StatusForbidden, "Access denied")
 		} else if errors.Is(err, service.ErrTaskNotFound) {
 			middleware.RespondWithError(w, http.StatusNotFound, "Task not found")
 		} else {
 			log.Logger.Error().Err(err).Msg("delete task error")
-			middleware.RespondWithError(w, http.StatusInternalServerError, "Delete task error")
+			middleware.RespondWithError(w, http.StatusInternalServerError, "Get task by ID error")
 		}
 		return
 	}
@@ -173,8 +184,8 @@ func (h *TaskHandler) GetTaskByID(w http.ResponseWriter, r *http.Request) {
 
 	middleware.RespondWithJSON(w, http.StatusOK, dto.SuccessResponse{
 		Message: "Task:",
-		Data:    dto.TaskWithNotes{
-			Task: *task,
+		Data: dto.TaskWithNotes{
+			Task:  *task,
 			Notes: notes,
 		},
 	})

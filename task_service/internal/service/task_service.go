@@ -17,9 +17,9 @@ import (
 )
 
 var (
-	ErrInvalidTaskData = errors.New("invalid task data")
-	ErrTaskNotFound    = errors.New("task not found")
-	ErrInvalidStatus = errors.New("invalid status")
+	ErrInvalidTaskData  = errors.New("invalid task data")
+	ErrTaskNotFound     = errors.New("task not found")
+	ErrInvalidStatus    = errors.New("invalid status")
 	ErrTaskAccessDenied = errors.New("access denied")
 )
 
@@ -48,18 +48,26 @@ func (s *TaskService) CreateTask(ctx context.Context, userID uuid.UUID, req dto.
 		task.Status = models.TaskStatusTodo
 	}
 
+	/*if task.Status != "" {
+		switch task.Status {
+		case models.TaskStatusTodo, models.TaskStatusInProgress, models.TaskStatusCancelled, models.TaskStatusDone:
+		default:
+			return nil, ErrInvalidStatus
+		}
+	}*/
+
 	if err := s.repo.CreateTask(ctx, &task); err != nil {
 		return nil, fmt.Errorf("failed to create task: %w", err)
 	}
 
 	redisConn.InvalidateTasksCache(userID.String())
-	events.PublishTaskEvent(events.EventTaskCreated, task.ID, task.UserID, nil)
+	events.PublishTaskCreated(task.ID, task.UserID)
 
 	return &task, nil
 }
 
 func (s *TaskService) UpdateTask(ctx context.Context, taskID, userID uuid.UUID, req dto.UpdateTaskRequest) (*models.Task, error) {
-	err := s.repo.UpdateTask(ctx, taskID, userID, req) 
+	err := s.repo.UpdateTask(ctx, taskID, userID, req)
 	if err != nil {
 		if errors.Is(err, repository.ErrTaskAccessDenied) {
 			return nil, ErrTaskAccessDenied
@@ -69,17 +77,15 @@ func (s *TaskService) UpdateTask(ctx context.Context, taskID, userID uuid.UUID, 
 
 	redisConn.InvalidateTasksCache(userID.String())
 
-	if req.Status != nil {
-		events.PublishTaskEvent(events.EventTaskStatusChanged, taskID, userID, map[string]any{
-			"new_status": *req.Status,
-		})
-	}
-
 	task, err := s.repo.GetTaskByID(ctx, taskID, userID)
 	if err != nil {
-    	return nil, fmt.Errorf("failed to get updated task: %w", err)
+		return nil, fmt.Errorf("failed to get updated task: %w", err)
 	}
-	
+
+	if req.Status != nil {
+		events.PublishTaskStatusChanged(taskID, userID, string(*req.Status), task.Title)
+	}
+
 	return task, nil
 }
 
@@ -93,7 +99,7 @@ func (s *TaskService) DeleteTask(ctx context.Context, taskID, userID uuid.UUID) 
 	}
 
 	redisConn.InvalidateTasksCache(userID.String())
-	events.PublishTaskEvent(events.EventTaskDeleted, taskID, userID, nil)
+	events.PublishTaskDeleted(taskID, userID)
 
 	return nil
 }
@@ -110,46 +116,46 @@ func (s *TaskService) GetTaskByID(ctx context.Context, taskID, userID uuid.UUID)
 }
 
 func (s *TaskService) GetAllByUser(ctx context.Context, userID uuid.UUID, q pagination.Query) ([]models.Task, int64, error) {
-    q = pagination.NewPaginationQuery(q.Page, q.Limit, q.Status)
+	q = pagination.NewPaginationQuery(q.Page, q.Limit, q.Status)
 
-    allTasks, err := redisConn.GetCachedTasksList(userID.String())
-    if err != nil {
-        allTasks, err = s.repo.GetAllByUser(ctx, userID)
-        if err != nil {
-            return nil, 0, fmt.Errorf("failed to get tasks: %w", err)
-        }
-        redisConn.CacheTasksList(userID.String(), allTasks)
-    }
+	allTasks, err := redisConn.GetCachedTasksList(userID.String())
+	if err != nil {
+		allTasks, err = s.repo.GetAllByUser(ctx, userID)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get tasks: %w", err)
+		}
+		redisConn.CacheTasksList(userID.String(), allTasks)
+	}
 
 	if q.Status != "" {
-    	switch models.TaskStatus(q.Status) {
-    	case models.TaskStatusTodo, models.TaskStatusInProgress, models.TaskStatusDone:
-    	
+		switch models.TaskStatus(q.Status) {
+		case models.TaskStatusTodo, models.TaskStatusInProgress, models.TaskStatusDone:
+
 		default:
-        return nil, 0, ErrInvalidStatus
-    	}
+			return nil, 0, ErrInvalidStatus
+		}
 	}
-	
-    if q.Status != "" {
-        filtered := []models.Task{}
-        for _, t := range allTasks {
-            if string(t.Status) == q.Status {
-                filtered = append(filtered, t)
-            }
-        }
-        allTasks = filtered
-    }
 
-    total := int64(len(allTasks))
-    start := (q.Page - 1) * q.Limit
-    end := start + q.Limit
+	if q.Status != "" {
+		filtered := []models.Task{}
+		for _, t := range allTasks {
+			if string(t.Status) == q.Status {
+				filtered = append(filtered, t)
+			}
+		}
+		allTasks = filtered
+	}
 
-    if start >= int(total) {
-        return []models.Task{}, total, nil
-    }
-    if end > int(total) {
-        end = int(total)
-    }
+	total := int64(len(allTasks))
+	start := (q.Page - 1) * q.Limit
+	end := start + q.Limit
 
-    return allTasks[start:end], total, nil
+	if start >= int(total) {
+		return []models.Task{}, total, nil
+	}
+	if end > int(total) {
+		end = int(total)
+	}
+
+	return allTasks[start:end], total, nil
 }

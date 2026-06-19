@@ -19,15 +19,15 @@ func SetupRoutes(h *handlers.Handler, health *health.Checker, authClient *authgr
 	api := r.PathPrefix("/api").Subrouter()
 	api.Use(middleware.AuthMiddleware(authClient))
 
-	api.HandleFunc("/tasks", h.Task.CreateTaskHandler).Methods("POST")              // создание задачи
-	api.HandleFunc("/tasks", h.Task.GetAllTasks).Methods("GET")                     // получение всех таск пользователя
-	api.HandleFunc("/tasks/{id}", h.Task.UpdateTaskHandler).Methods("PUT", "PATCH") // обновление
-	api.HandleFunc("/tasks/{id}", h.Task.DeleteTaskHandler).Methods("DELETE")       // удаление
-	api.HandleFunc("/tasks/{id}", h.Task.GetTaskByID).Methods("GET")                // получить по айдишнику
+	api.HandleFunc("/tasks", h.Task.CreateTaskHandler).Methods("POST")
+	api.HandleFunc("/tasks", h.Task.GetAllTasks).Methods("GET")
+	api.HandleFunc("/tasks/{id}", h.Task.UpdateTaskHandler).Methods("PUT", "PATCH")
+	api.HandleFunc("/tasks/{id}", h.Task.DeleteTaskHandler).Methods("DELETE")
+	api.HandleFunc("/tasks/{id}", h.Task.GetTaskByID).Methods("GET")
 
 
-	api.HandleFunc("/tasks/{id}/notes", h.Note.CreateNoteHandler).Methods("POST")     // создание заметки
-	api.HandleFunc("/tasks/{id}/notes", h.Note.GetNoteHandler).Methods("GET")         // получить по айдишнику
-	api.HandleFunc("/notes/{noteId}", h.Note.DeleteNoteHandler).Methods("DELETE") // удалить
+	api.HandleFunc("/tasks/{id}/notes", h.Note.CreateNoteHandler).Methods("POST")
+	api.HandleFunc("/tasks/{id}/notes", h.Note.GetNoteHandler).Methods("GET")
+	api.HandleFunc("/notes/{noteId}", h.Note.DeleteNoteHandler).Methods("DELETE")
 	return r
 }

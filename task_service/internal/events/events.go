@@ -56,7 +56,36 @@ func CloseNATS() {
 	}
 }
 
-func PublishTaskEvent(eventType string, taskID, userID uuid.UUID, payload any) {
+func PublishTaskCreated(taskID, userID uuid.UUID) {
+	publishTaskEvent(EventTaskCreated, taskID, userID, nil)
+}
+
+func PublishTaskStatusChanged(taskID, userID uuid.UUID, newStatus, title string) {
+	publishTaskEvent(EventTaskStatusChanged, taskID, userID, map[string]any{
+		"new_status": newStatus,
+		"title":      title,
+	})
+}
+
+func PublishTaskDeadlineApproaching(taskID, userID uuid.UUID, title, deadline string) {
+	publishTaskEvent("task.deadline_approaching", taskID, userID, map[string]any{
+		"title":    title,
+		"deadline": deadline,
+	})
+}
+
+func PublishTaskDeleted(taskID, userID uuid.UUID) {
+	publishTaskEvent(EventTaskDeleted, taskID, userID, nil)
+}
+
+func PublishNoteAdded(taskID, userID uuid.UUID, noteID, text string) {
+	publishTaskEvent(EventNoteAdded, taskID, userID, map[string]any{
+		"note_id": noteID,
+		"text":    text,
+	})
+}
+
+func publishTaskEvent(eventType string, taskID, userID uuid.UUID, payload any) {
 	event := TaskEvent{
 		EventType: eventType,
 		TaskID:    taskID,

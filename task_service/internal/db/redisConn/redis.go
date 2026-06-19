@@ -91,11 +91,6 @@ func TasksListKey(userID string) string {
 	return "tasks:list:" + userID
 }
 
-func UserProfileKey(userID string) string {
-	return "user:profile:" + userID
-}
-
-// Task func
 func CacheTasksList(userID string, tasks []models.Task) error {
 	return SetCache(TasksListKey(userID), tasks, CacheTTLTasks)
 }
@@ -109,4 +104,3 @@ func GetCachedTasksList(userID string) ([]models.Task, error) {
 func InvalidateTasksCache(userID string) error {
 	return DeleteCache(TasksListKey(userID))
 }
-

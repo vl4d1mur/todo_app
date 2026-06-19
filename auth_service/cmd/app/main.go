@@ -22,32 +22,49 @@ import (
 	"auth_service/pkg/pb"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 )
 
 func main() {
 	log.InitLogger()
-    config.LoadConfig()
+	config.LoadConfig()
 
-    redisConn.ConnectRedis()
-    postgres.ConnectPostgres()
+	redisConn.ConnectRedis()
+	postgres.ConnectPostgres()
 
-    userRepo := repository.NewUserRepository()
+	userRepo := repository.NewUserRepository()
 	sessionRepo := repository.NewSessionRepository()
 
-    authSvc := service.NewAuthService(userRepo, sessionRepo)
+	authSvc := service.NewAuthService(userRepo, sessionRepo)
 
-    h := handlers.NewHandler(authSvc)
-    
+	h := handlers.NewHandler(authSvc)
+
 	healthChecker := health.NewChecker(
-    postgres.DB,
-    redisConn.RedisClient,
-
+		postgres.DB,
+		redisConn.RedisClient,
 	)
-	
+
 	router := routes.SetupRoutes(h, healthChecker)
-	
-	grpcServer := grpc.NewServer()
-	pb.RegisterAuthServiceServer(grpcServer, authgrpc.NewAuthServer())
+
+	var kaep = keepalive.EnforcementPolicy{
+		MinTime:             5 * time.Second,
+		PermitWithoutStream: true,
+	}
+
+	var kasp = keepalive.ServerParameters{
+		MaxConnectionIdle:     5 * time.Minute,
+		MaxConnectionAge:      30 * time.Minute,
+		MaxConnectionAgeGrace: 30 * time.Second,
+		Time:                  60 * time.Second,
+		Timeout:               20 * time.Second,
+	}
+
+	grpcServer := grpc.NewServer(
+		grpc.KeepaliveEnforcementPolicy(kaep),
+		grpc.KeepaliveParams(kasp),
+	)
+
+	pb.RegisterAuthServiceServer(grpcServer, authgrpc.NewAuthServer(userRepo))
 
 	go func() {
 		lis, err := net.Listen("tcp", config.GrpcPort)
@@ -58,7 +75,7 @@ func main() {
 		if err := grpcServer.Serve(lis); err != nil {
 			log.Logger.Fatal().Err(err).Msg("gRPC server error")
 		}
-	} ()
+	}()
 
 	log.Logger.Info().Msg("Starting server")
 	srv := &http.Server{
@@ -91,7 +108,7 @@ func main() {
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Logger.Error().Err(err).Msg("HTTP server shutdown error:")
 	}
-	log.Logger.Info().Msg("HTTP server stoped")
+	log.Logger.Info().Msg("HTTP server stopped")
 
 	grpcServer.GracefulStop()
 	log.Logger.Info().Msg("gRPC server stopped")

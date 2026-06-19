@@ -80,7 +80,6 @@ func TasksListKey(userID string) string {
 func UserProfileKey(userID string) string {
 	return "user:profile:" + userID
 }
-// Profile func
 
 func CacheUserProfile(userID string, user models.User) error {
 	return SetCache(UserProfileKey(userID), user, CacheTTLProfile)

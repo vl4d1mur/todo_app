@@ -10,10 +10,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
-
-var ErrUserNotFound = errors.New("user not found")
-var ErrUserAlrdeadyExists = errors.New("user with this email already exists")
-
+var(
+ ErrUserNotFound = errors.New("user not found")
+ ErrUserAlrdeadyExists = errors.New("user with this email already exists")
+)
 var _ UserRepository = (*UserRepositoryImpl)(nil)
 
 type UserRepositoryImpl struct{}

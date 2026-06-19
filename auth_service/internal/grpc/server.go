@@ -5,14 +5,18 @@ import (
 
 	"auth_service/pkg/jwt"
 	"auth_service/pkg/pb"
+	"auth_service/internal/repository"
+
+	"github.com/google/uuid"
 )
 
 type AuthServer struct {
 	pb.UnimplementedAuthServiceServer
+	userRepo repository.UserRepository
 }
 
-func NewAuthServer() *AuthServer { 
-	return &AuthServer{}
+func NewAuthServer(userRepo repository.UserRepository) *AuthServer { 
+	return &AuthServer{userRepo: userRepo}
 }
 
 func (s *AuthServer) ValidateToken(ctx context.Context, req *pb.ValidateTokenRequest) (*pb.ValidateTokenResponse, error) {
@@ -29,4 +33,25 @@ func (s *AuthServer) ValidateToken(ctx context.Context, req *pb.ValidateTokenReq
 		UserId: claims.UserID.String(),
 	}, nil
 }
+
+func (s *AuthServer) GetUserEmail(ctx context.Context, req *pb.GetUserEmailRequest) (*pb.GetUserEmailResponse, error){
+	userID, err := uuid.Parse(req.UserId)
+	if err != nil {
+		return &pb.GetUserEmailResponse{
+			Error: "invalid user_id format",
+		}, nil
+	}
+
+	user, err := s.userRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		return &pb.GetUserEmailResponse{
+			Error: "user not found",
+		}, nil
+	}
+
+	return &pb.GetUserEmailResponse{
+		Email: user.Email,
+	}, nil
+}
+
 

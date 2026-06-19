@@ -9,7 +9,7 @@ import (
 type CreateTaskRequest struct {
 	Title       string            `json:"title" validate:"required,min=3,max=200"`
 	Description string            `json:"description" validate:"max=1000"`
-	Status      models.TaskStatus `json:"status" validate:"oneof=todo in_progress done cancelled"`
+	Status      models.TaskStatus `json:"status" validate:"omitempty,oneof=todo in_progress done cancelled"`
 	Priority    int               `json:"priority" validate:"min=1,max=4"`
 	Deadline    *time.Time        `json:"deadline"`
 }
@@ -17,7 +17,7 @@ type CreateTaskRequest struct {
 type UpdateTaskRequest struct {
 	Title       *string            `json:"title,omitempty"`
 	Description *string            `json:"description,omitempty"`
-	Status      *models.TaskStatus `json:"status,omitempty"`
+	Status      *models.TaskStatus `json:"status,omitempty" validate:"omitempty,oneof=todo in_progress done cancelled"`
 	Deadline    *time.Time         `json:"deadline,omitempty"`
 	Priority    *int               `json:"priority,omitempty"`
 }

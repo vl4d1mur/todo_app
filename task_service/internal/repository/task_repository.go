@@ -152,3 +152,37 @@ func (r *TaskRepositoryImpl) DeleteTask(ctx context.Context, taskID, userID uuid
 
 	return err
 }
+
+
+func (r *TaskRepositoryImpl) GetTasksWithUpcomingDeadline(ctx context.Context) ([]models.Task, error) {
+	rows, err := postgres.DB.Query(ctx, `
+		SELECT id, user_id, title, description, status, priority, deadline, created_at, updated_at
+		FROM tasks
+		WHERE deadline IS NOT NULL
+		  AND deadline BETWEEN NOW() AND NOW() + INTERVAL '24 hours'
+		  AND status != 'done'
+		  AND status != 'cancelled'
+		  AND deadline_notified = false
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	tasks := []models.Task{}
+	for rows.Next() {
+		var t models.Task
+		if err := rows.Scan(&t.ID, &t.UserID, &t.Title, &t.Description, &t.Status, &t.Priority, &t.DeadLine, &t.CreatedAt, &t.UpdatedAt); err != nil {
+			log.Logger.Warn().Err(err).Msg("Failed to scan task row")
+			continue
+		}
+		tasks = append(tasks, t)
+	}
+	return tasks, nil
+}
+
+func (r *TaskRepositoryImpl) MarkDeadlineNotified(ctx context.Context, taskID uuid.UUID) error {
+	_, err := postgres.DB.Exec(ctx,
+		"UPDATE tasks SET deadline_notified = true WHERE id = $1", taskID)
+	return err
+}
