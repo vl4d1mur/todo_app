@@ -15,13 +15,12 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-var(
-	_ NotificationRepository = (*NotificationRepositoryImpl)(nil)
-	ErrNotificationNotFound = errors.New("notification not found")
+var (
+	_                       NotificationRepository = (*NotificationRepositoryImpl)(nil)
+	ErrNotificationNotFound                        = errors.New("notification not found")
 )
 
-
-type NotificationRepositoryImpl struct {}
+type NotificationRepositoryImpl struct{}
 
 func NewNotificationRepository() *NotificationRepositoryImpl {
 	return &NotificationRepositoryImpl{}
@@ -32,6 +31,9 @@ func (r *NotificationRepositoryImpl) collection() *mongodriver.Collection {
 }
 
 func (r *NotificationRepositoryImpl) Create(ctx context.Context, n *models.Notification) error {
+	if n.ID.IsZero() {
+		n.ID = bson.NewObjectID()
+	}
 	n.CreatedAt = time.Now()
 
 	_, err := r.collection().InsertOne(ctx, n)

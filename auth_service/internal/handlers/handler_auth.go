@@ -70,9 +70,11 @@ func (h *AuthHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidPassword) {
 			middleware.RespondWithError(w, http.StatusUnauthorized, "Invalid email or password")
+		} else if errors.Is(err, service.ErrUserNotFound) {
+			log.Logger.Error().Err(err).Msg("User not found")
+			middleware.RespondWithError(w, http.StatusNotFound, "User not found")
 		} else {
-			log.Logger.Error().Err(err).Msg("Login error")
-			middleware.RespondWithJSON(w, http.StatusInternalServerError, "Login failed")
+			middleware.RespondWithError(w, http.StatusInternalServerError, "Login failed")
 		}
 		return
 	}

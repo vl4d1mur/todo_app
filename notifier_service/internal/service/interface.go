@@ -14,3 +14,7 @@ type NotifierServiceInterface interface {
 	HandleDeadlineApproaching(ctx context.Context, userID, taskID uuid.UUID, taskTitle, deadline string) error
 	GetByUserID(ctx context.Context, userID uuid.UUID, q pagination.Query) ([]models.Notification, int64, error)
 }
+
+type AuthClient interface {
+	GetUserEmail(ctx context.Context, userID string) (string, error)
+}

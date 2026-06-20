@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	authgrpc "notifier_service/internal/grpc"
 	"notifier_service/internal/models"
 	"notifier_service/internal/repository"
 	"notifier_service/pkg/log"
@@ -16,14 +15,14 @@ import (
 
 type NotifierService struct {
 	repo       repository.NotificationRepository
-	authClient *authgrpc.AuthClient
-	smtp       *SMTPservice
+	authClient AuthClient
+	smtp       *SMTPService
 }
 
 func NewNotifierService(
 	repo repository.NotificationRepository,
-	authClient *authgrpc.AuthClient,
-	smtp *SMTPservice,
+	authClient AuthClient,
+	smtp *SMTPService,
 ) *NotifierService {
 	return &NotifierService{
 		repo:       repo,

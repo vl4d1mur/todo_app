@@ -13,12 +13,12 @@ import (
 
 var ErrSendEmail = errors.New("Failed to send email")
 
-type SMTPservice struct {
+type SMTPService struct {
 	dialer *gomail.Dialer
 	from string
 }
 
-func NewSMTPService() *SMTPservice {
+func NewSMTPService() *SMTPService {
 	port, err := strconv.Atoi(config.SmtpPort)
 	if err != nil {
 		log.Logger.Fatal().Err(err).Msg("Invalid SMTP port:")
@@ -26,13 +26,13 @@ func NewSMTPService() *SMTPservice {
 
 	dialer := gomail.NewDialer(config.SmtpHost, port, "", "")
 	
-	return &SMTPservice{
+	return &SMTPService{
 		dialer: dialer,
 		from: config.SmtpFrom,
 	}
 }
 
-func (s *SMTPservice) Send(to, subject, body string) error {
+func (s *SMTPService) Send(to, subject, body string) error {
 	m := gomail.NewMessage()
 	m.SetHeader("From", s.from)
 	m.SetHeader("To", to)
