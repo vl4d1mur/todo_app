@@ -166,8 +166,8 @@ func TestLogin_UserNotFound(t *testing.T) {
 		Password: "password123",
 	})
 
-	if !errors.Is(err, service.ErrInvalidPassword) {
-		t.Errorf("Expected ErrInvalidPassword, got %v", err)
+	if !errors.Is(err, service.ErrUserNotFound) {
+		t.Errorf("Expected ErrUserNotFound, got %v", err)
 	}
 }
 
