@@ -9,22 +9,21 @@ import (
 
 var Logger zerolog.Logger
 
-
 func InitLogger() {
 	env := os.Getenv("APP_ENV")
-	
-	if env == ""{
+
+	if env == "" {
 		env = "development"
 	}
 
 	if env == "production" {
 		Logger = zerolog.New(os.Stdout).
-		With().
-		Timestamp().
-		Logger()
+			With().
+			Timestamp().
+			Logger()
 	} else {
 		Logger = zerolog.New(zerolog.ConsoleWriter{
-			Out: os.Stdout,
+			Out:        os.Stdout,
 			TimeFormat: time.RFC3339,
 		}).
 			With().
@@ -32,4 +31,3 @@ func InitLogger() {
 			Logger()
 	}
 }
-

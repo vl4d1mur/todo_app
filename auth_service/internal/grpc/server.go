@@ -3,9 +3,9 @@ package grpc
 import (
 	"context"
 
+	"auth_service/internal/repository"
 	"auth_service/pkg/jwt"
 	"auth_service/pkg/pb"
-	"auth_service/internal/repository"
 
 	"github.com/google/uuid"
 )
@@ -15,7 +15,7 @@ type AuthServer struct {
 	userRepo repository.UserRepository
 }
 
-func NewAuthServer(userRepo repository.UserRepository) *AuthServer { 
+func NewAuthServer(userRepo repository.UserRepository) *AuthServer {
 	return &AuthServer{userRepo: userRepo}
 }
 
@@ -29,12 +29,12 @@ func (s *AuthServer) ValidateToken(ctx context.Context, req *pb.ValidateTokenReq
 	}
 
 	return &pb.ValidateTokenResponse{
-		Valid: true,
+		Valid:  true,
 		UserId: claims.UserID.String(),
 	}, nil
 }
 
-func (s *AuthServer) GetUserEmail(ctx context.Context, req *pb.GetUserEmailRequest) (*pb.GetUserEmailResponse, error){
+func (s *AuthServer) GetUserEmail(ctx context.Context, req *pb.GetUserEmailRequest) (*pb.GetUserEmailResponse, error) {
 	userID, err := uuid.Parse(req.UserId)
 	if err != nil {
 		return &pb.GetUserEmailResponse{
@@ -53,5 +53,3 @@ func (s *AuthServer) GetUserEmail(ctx context.Context, req *pb.GetUserEmailReque
 		Email: user.Email,
 	}, nil
 }
-
-

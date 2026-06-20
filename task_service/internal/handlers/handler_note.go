@@ -13,7 +13,6 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
-
 func (h *NoteHandler) CreateNoteHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserIDFromContext(r)
 	if !ok {

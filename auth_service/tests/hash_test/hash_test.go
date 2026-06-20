@@ -1,8 +1,8 @@
 package hash_test
 
 import (
-	"testing"
 	"auth_service/pkg/hash"
+	"testing"
 )
 
 func TestHashPassword_Success(t *testing.T) {

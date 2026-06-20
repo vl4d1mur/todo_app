@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"task_service/pkg/log"
 	"task_service/internal/config"
+	"task_service/pkg/log"
 
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -22,7 +22,7 @@ func ConnectMongo() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	if err := client.Ping(ctx, nil); err != nil {
 		log.Logger.Fatal().Err(err).Msg("Ping error:")
 	}

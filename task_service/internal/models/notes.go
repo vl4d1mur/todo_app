@@ -15,4 +15,3 @@ type Note struct {
 	Meta      map[string]any `json:"meta" bson:"meta"`
 	CreatedAt time.Time      `json:"created_at" bson:"created_at"`
 }
-

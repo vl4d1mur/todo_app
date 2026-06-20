@@ -13,7 +13,7 @@ func SetupRoutes(h *handlers.Handler, health *health.Checker) *mux.Router {
 	r.Use(middleware.Logger)
 
 	r.HandleFunc("/healthz", health.Liveness).Methods("GET")
-    r.HandleFunc("/readyz", health.Readiness).Methods("GET")
+	r.HandleFunc("/readyz", health.Readiness).Methods("GET")
 
 	r.HandleFunc("/api/register", h.Auth.RegisterHandler).Methods("POST")
 	r.HandleFunc("/api/login", h.Auth.LoginHandler).Methods("POST")

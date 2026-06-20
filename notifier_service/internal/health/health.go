@@ -12,8 +12,8 @@ import (
 )
 
 type Checker struct {
-	mongo    *mongo.Database
-	nats     *nats.Conn
+	mongo *mongo.Database
+	nats  *nats.Conn
 }
 
 func NewChecker(
@@ -21,8 +21,8 @@ func NewChecker(
 	nats *nats.Conn,
 ) *Checker {
 	return &Checker{
-		mongo:    mongo,
-		nats:     nats,
+		mongo: mongo,
+		nats:  nats,
 	}
 }
 

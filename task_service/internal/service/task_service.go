@@ -11,6 +11,7 @@ import (
 	"task_service/internal/events"
 	"task_service/internal/models"
 	"task_service/internal/repository"
+	"task_service/pkg/log"
 	"task_service/pkg/pagination"
 
 	"github.com/google/uuid"
@@ -60,7 +61,9 @@ func (s *TaskService) CreateTask(ctx context.Context, userID uuid.UUID, req dto.
 		return nil, fmt.Errorf("failed to create task: %w", err)
 	}
 
-	redisConn.InvalidateTasksCache(userID.String())
+	if err := redisConn.InvalidateTasksCache(userID.String()); err != nil {
+		log.Logger.Warn().Err(err).Msg("Failed to invalidate tasks cache")
+	}
 	events.PublishTaskCreated(task.ID, task.UserID)
 
 	return &task, nil
@@ -75,7 +78,9 @@ func (s *TaskService) UpdateTask(ctx context.Context, taskID, userID uuid.UUID, 
 		return nil, ErrTaskNotFound
 	}
 
-	redisConn.InvalidateTasksCache(userID.String())
+	if err := redisConn.InvalidateTasksCache(userID.String()); err != nil {
+		log.Logger.Warn().Err(err).Msg("Failed to invalidate tasks cache")
+	}
 
 	task, err := s.repo.GetTaskByID(ctx, taskID, userID)
 	if err != nil {
@@ -98,7 +103,9 @@ func (s *TaskService) DeleteTask(ctx context.Context, taskID, userID uuid.UUID) 
 		return ErrTaskNotFound
 	}
 
-	redisConn.InvalidateTasksCache(userID.String())
+	if err := redisConn.InvalidateTasksCache(userID.String()); err != nil {
+		log.Logger.Warn().Err(err).Msg("Failed to invalidate tasks cache")
+	}
 	events.PublishTaskDeleted(taskID, userID)
 
 	return nil
@@ -124,7 +131,9 @@ func (s *TaskService) GetAllByUser(ctx context.Context, userID uuid.UUID, q pagi
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to get tasks: %w", err)
 		}
-		redisConn.CacheTasksList(userID.String(), allTasks)
+		if err := redisConn.CacheTasksList(userID.String(), allTasks); err != nil {
+			log.Logger.Warn().Err(err).Msg("Failed to cache tasks list")
+		}
 	}
 
 	if q.Status != "" {

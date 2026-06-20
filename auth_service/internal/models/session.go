@@ -7,9 +7,9 @@ import (
 )
 
 type Session struct {
-	ID uuid.UUID `json:"id" db:"id"`
-	UserID uuid.UUID `json:"user_id" db:"user_id"`
-	RefreshToken string `json:"-" db:"refresh_token"`
-	ExpiresAt time.Time `json:"expires_at" db:"expires_at"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	ID           uuid.UUID `json:"id" db:"id"`
+	UserID       uuid.UUID `json:"user_id" db:"user_id"`
+	RefreshToken string    `json:"-" db:"refresh_token"`
+	ExpiresAt    time.Time `json:"expires_at" db:"expires_at"`
+	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 }

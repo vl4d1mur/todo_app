@@ -1,6 +1,6 @@
 package dto
 
-import(
+import (
 	"auth_service/internal/models"
 )
 
@@ -16,10 +16,10 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	Token string `json:"token"`
-	User  models.User   `json:"user"`
+	Token string      `json:"token"`
+	User  models.User `json:"user"`
 }
 
 type RefreshRequest struct {
-    RefreshToken string `json:"refresh_token"`
+	RefreshToken string `json:"refresh_token"`
 }

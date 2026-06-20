@@ -54,11 +54,15 @@ func (s *NotifierService) createAndSend(
 
 	if err := s.smtp.Send(recipient, subject, body); err != nil {
 		log.Logger.Error().Err(err).Msg("Failed to send email")
-		s.repo.UpdateStatus(ctx, notification.ID.Hex(), models.StatusFailed, err.Error())
+		if updateErr := s.repo.UpdateStatus(ctx, notification.ID.Hex(), models.StatusFailed, err.Error()); updateErr != nil {
+			log.Logger.Error().Err(updateErr).Msg("Failed to update notification status to failed")
+		}
 		return err
 	}
 
-	s.repo.UpdateStatus(ctx, notification.ID.Hex(), models.StatusSent, "")
+	if err := s.repo.UpdateStatus(ctx, notification.ID.Hex(), models.StatusSent, ""); err != nil {
+		log.Logger.Error().Err(err).Msg("Failed to update notification status to sent")
+	}
 	_ = time.Now()
 	return nil
 }

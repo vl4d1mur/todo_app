@@ -5,25 +5,25 @@ import (
 )
 
 type Handler struct {
-    Task *TaskHandler
-    Note *NoteHandler
+	Task *TaskHandler
+	Note *NoteHandler
 }
 
 type TaskHandler struct {
-    service service.TaskServiceInterface
-    noteService service.NoteServiceInterface
+	service     service.TaskServiceInterface
+	noteService service.NoteServiceInterface
 }
 
 type NoteHandler struct {
-    service service.NoteServiceInterface
+	service service.NoteServiceInterface
 }
 
 func NewHandler(
-    taskSvc service.TaskServiceInterface,
-    noteSvc service.NoteServiceInterface,
+	taskSvc service.TaskServiceInterface,
+	noteSvc service.NoteServiceInterface,
 ) *Handler {
-    return &Handler{
-        Task: &TaskHandler{service: taskSvc, noteService: noteSvc},
-        Note: &NoteHandler{service: noteSvc},
-    }
+	return &Handler{
+		Task: &TaskHandler{service: taskSvc, noteService: noteSvc},
+		Note: &NoteHandler{service: noteSvc},
+	}
 }

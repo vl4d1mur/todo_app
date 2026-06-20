@@ -43,7 +43,7 @@ func (h *TaskHandler) CreateTaskHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	middleware.RespondWithJSON(w, http.StatusCreated, dto.SuccessResponse{
-		Message: "Task created succesfully",
+		Message: "Task created successfully",
 		Data:    task,
 	})
 }

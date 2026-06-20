@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
+	"task_service/internal/config"
 	"task_service/internal/db/mongo"
 	"task_service/internal/models"
-	"task_service/internal/config"
 
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -14,7 +14,7 @@ import (
 
 var _ NoteRepository = (*NoteRepositoryImpl)(nil)
 
-type NoteRepositoryImpl struct {}
+type NoteRepositoryImpl struct{}
 
 func NewNoteRepository() *NoteRepositoryImpl {
 	return &NoteRepositoryImpl{}
@@ -29,7 +29,7 @@ func (r *NoteRepositoryImpl) CreateNote(ctx context.Context, note *models.Note) 
 
 func (r *NoteRepositoryImpl) DeleteNote(ctx context.Context, noteID bson.ObjectID, userID uuid.UUID) error {
 	filter := bson.M{
-		"_id": noteID,
+		"_id":       noteID,
 		"author_id": userID,
 	}
 

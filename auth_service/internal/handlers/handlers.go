@@ -5,15 +5,15 @@ import (
 )
 
 type Handler struct {
-    Auth *AuthHandler
+	Auth *AuthHandler
 }
 
 type AuthHandler struct {
-    service service.AuthServiceInterface
+	service service.AuthServiceInterface
 }
 
-func NewHandler(authSvc service.AuthServiceInterface,) *Handler {
-    return &Handler{
-        Auth: &AuthHandler{service: authSvc},
-    }
+func NewHandler(authSvc service.AuthServiceInterface) *Handler {
+	return &Handler{
+		Auth: &AuthHandler{service: authSvc},
+	}
 }

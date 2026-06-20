@@ -1,9 +1,9 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
-	"errors"
 
 	"notifier_service/internal/config"
 	"notifier_service/pkg/log"
@@ -11,11 +11,11 @@ import (
 	"gopkg.in/gomail.v2"
 )
 
-var ErrSendEmail = errors.New("Failed to send email")
+var ErrSendEmail = errors.New("failed to send email")
 
 type SMTPService struct {
 	dialer *gomail.Dialer
-	from string
+	from   string
 }
 
 func NewSMTPService() *SMTPService {
@@ -25,10 +25,10 @@ func NewSMTPService() *SMTPService {
 	}
 
 	dialer := gomail.NewDialer(config.SmtpHost, port, "", "")
-	
+
 	return &SMTPService{
 		dialer: dialer,
-		from: config.SmtpFrom,
+		from:   config.SmtpFrom,
 	}
 }
 
@@ -39,7 +39,7 @@ func (s *SMTPService) Send(to, subject, body string) error {
 	m.SetHeader("Subject", subject)
 	m.SetHeader("text/plain", body)
 
-	err := s.dialer.DialAndSend(m) 
+	err := s.dialer.DialAndSend(m)
 	if err != nil {
 		return fmt.Errorf("failed to send email %w", err)
 	}

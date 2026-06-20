@@ -48,13 +48,13 @@ func (h *AuthHandler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 			middleware.RespondWithError(w, http.StatusConflict, "User with this email already exists")
 		} else {
 			log.Logger.Error().Err(err).Msg("Register error")
-			middleware.RespondWithError(w, http.StatusInternalServerError, "Registartion failed")
+			middleware.RespondWithError(w, http.StatusInternalServerError, "Registration failed")
 		}
 		return
 	}
 
 	middleware.RespondWithJSON(w, http.StatusCreated, dto.SuccessResponse{
-		Message: "User registration succesful",
+		Message: "User registration successful",
 		Data:    user,
 	})
 }

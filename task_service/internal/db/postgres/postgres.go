@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"task_service/pkg/log"
 	"task_service/internal/config"
+	"task_service/pkg/log"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

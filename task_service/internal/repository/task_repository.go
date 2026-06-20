@@ -17,7 +17,7 @@ import (
 var _ TaskRepository = (*TaskRepositoryImpl)(nil)
 
 var (
-	ErrTaskNotFound = errors.New("task not found or access denied")
+	ErrTaskNotFound     = errors.New("task not found or access denied")
 	ErrTaskAccessDenied = errors.New("access to task denied")
 )
 
@@ -65,7 +65,7 @@ func (r *TaskRepositoryImpl) GetTaskByID(ctx context.Context, taskID, userID uui
 		&task.Status, &task.Priority, &task.DeadLine, &task.CreatedAt, &task.UpdatedAt)
 
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows){
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrTaskNotFound
 		}
 		return nil, err
@@ -79,11 +79,11 @@ func (r *TaskRepositoryImpl) GetTaskByID(ctx context.Context, taskID, userID uui
 }
 
 func (r *TaskRepositoryImpl) UpdateTask(ctx context.Context, taskID, userID uuid.UUID, req dto.UpdateTaskRequest) error {
-	
+
 	var ownerID uuid.UUID
 	err := postgres.DB.QueryRow(ctx,
-	`SELECT user_id FROM tasks WHERE id = $1`, taskID).Scan(&ownerID)
-	
+		`SELECT user_id FROM tasks WHERE id = $1`, taskID).Scan(&ownerID)
+
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrTaskNotFound
@@ -147,12 +147,11 @@ func (r *TaskRepositoryImpl) DeleteTask(ctx context.Context, taskID, userID uuid
 	if ownerID != userID {
 		return ErrTaskAccessDenied
 	}
-	
+
 	_, err = postgres.DB.Exec(ctx, "DELETE FROM tasks WHERE id = $1", taskID)
 
 	return err
 }
-
 
 func (r *TaskRepositoryImpl) GetTasksWithUpcomingDeadline(ctx context.Context) ([]models.Task, error) {
 	rows, err := postgres.DB.Query(ctx, `

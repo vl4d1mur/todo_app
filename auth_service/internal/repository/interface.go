@@ -16,8 +16,8 @@ type UserRepository interface {
 }
 
 type SessionRepository interface {
-    CreateSession(ctx context.Context, session *models.Session) error
-    GetSessionByToken(ctx context.Context, refreshToken string) (*models.Session, error)
-    DeleteSessionByToken(ctx context.Context, refreshToken string) error
-    DeleteAllSessionsByUser(ctx context.Context, userID uuid.UUID) error
+	CreateSession(ctx context.Context, session *models.Session) error
+	GetSessionByToken(ctx context.Context, refreshToken string) (*models.Session, error)
+	DeleteSessionByToken(ctx context.Context, refreshToken string) error
+	DeleteAllSessionsByUser(ctx context.Context, userID uuid.UUID) error
 }

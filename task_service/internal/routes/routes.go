@@ -14,7 +14,7 @@ func SetupRoutes(h *handlers.Handler, health *health.Checker, authClient *authgr
 	r.Use(middleware.Logger)
 
 	r.HandleFunc("/healthz", health.Liveness).Methods("GET")
-    r.HandleFunc("/readyz", health.Readiness).Methods("GET")
+	r.HandleFunc("/readyz", health.Readiness).Methods("GET")
 
 	api := r.PathPrefix("/api").Subrouter()
 	api.Use(middleware.AuthMiddleware(authClient))
@@ -24,7 +24,6 @@ func SetupRoutes(h *handlers.Handler, health *health.Checker, authClient *authgr
 	api.HandleFunc("/tasks/{id}", h.Task.UpdateTaskHandler).Methods("PUT", "PATCH")
 	api.HandleFunc("/tasks/{id}", h.Task.DeleteTaskHandler).Methods("DELETE")
 	api.HandleFunc("/tasks/{id}", h.Task.GetTaskByID).Methods("GET")
-
 
 	api.HandleFunc("/tasks/{id}/notes", h.Note.CreateNoteHandler).Methods("POST")
 	api.HandleFunc("/tasks/{id}/notes", h.Note.GetNoteHandler).Methods("GET")

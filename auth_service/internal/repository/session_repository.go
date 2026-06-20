@@ -7,6 +7,7 @@ import (
 
 	"auth_service/internal/db/postgres"
 	"auth_service/internal/models"
+	"auth_service/pkg/log"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -43,7 +44,9 @@ func (r *SessionRepositoryImpl) GetSessionByToken(ctx context.Context, refreshTo
 	}
 
 	if time.Now().After(s.ExpiresAt) {
-		r.DeleteSessionByToken(ctx, refreshToken)
+		if err := r.DeleteSessionByToken(ctx, refreshToken); err != nil {
+			log.Logger.Warn().Err(err).Msg("Failed to delete expired session")
+		}
 		return nil, ErrSessionNotFound
 	}
 

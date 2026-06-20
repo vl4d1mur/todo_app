@@ -17,11 +17,11 @@ import (
 var ErrNoteNotFound = fmt.Errorf("note not found or access denied")
 
 type NoteService struct {
-    repo repository.NoteRepository
+	repo repository.NoteRepository
 }
 
 func NewNoteService(repo repository.NoteRepository) *NoteService {
-    return &NoteService{repo: repo}
+	return &NoteService{repo: repo}
 }
 
 func (s *NoteService) CreateNote(ctx context.Context, taskID, userID uuid.UUID, req dto.CreateNoteRequest) (*models.Note, error) {
@@ -40,7 +40,7 @@ func (s *NoteService) CreateNote(ctx context.Context, taskID, userID uuid.UUID, 
 	}
 
 	events.PublishNoteAdded(taskID, userID, note.ID.Hex(), note.Text)
-	
+
 	return &note, nil
 }
 
@@ -48,7 +48,7 @@ func (s *NoteService) DeleteNote(ctx context.Context, noteID bson.ObjectID, user
 	if err := s.repo.DeleteNote(ctx, noteID, userID); err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 

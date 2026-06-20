@@ -51,7 +51,9 @@ func ConnectNATS() {
 
 func CloseNATS() {
 	if NatsConn != nil {
-		NatsConn.Drain()
+		if err := NatsConn.Drain(); err != nil {
+			log.Logger.Error().Err(err).Msg("NATS drain error")
+		}
 		log.Logger.Info().Msg("NATS connection closed")
 	}
 }

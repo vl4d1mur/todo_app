@@ -5,27 +5,27 @@ import (
 	"encoding/json"
 	"time"
 
-	"auth_service/pkg/log"
 	"auth_service/internal/config"
 	"auth_service/internal/models"
+	"auth_service/pkg/log"
 	"github.com/redis/go-redis/v9"
 )
 
 var RedisClient *redis.Client
 
 const (
-	CacheTTLTasks = 5 * time.Minute
+	CacheTTLTasks   = 5 * time.Minute
 	CacheTTLProfile = 15 * time.Minute
 )
 
 func ConnectRedis() {
 	RedisClient = redis.NewClient(&redis.Options{
-		Addr: config.RedisAddr,
+		Addr:     config.RedisAddr,
 		Password: config.RedisPassword,
-		DB: 0,
+		DB:       0,
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if _, err := RedisClient.Ping(ctx).Result(); err != nil {
@@ -43,7 +43,7 @@ func CloseRedis() {
 }
 
 func SetCache(key string, value interface{}, ttl time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	data, err := json.Marshal(value)
@@ -67,7 +67,7 @@ func GetCache(key string, dest interface{}) error {
 }
 
 func DeleteCache(key string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	return RedisClient.Del(ctx, key).Err()

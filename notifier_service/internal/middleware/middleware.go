@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"notifier_service/pkg/log"
 	authgrpc "notifier_service/internal/grpc"
+	"notifier_service/pkg/log"
 
 	"github.com/google/uuid"
 )
@@ -29,7 +29,7 @@ const (
 	contextKeyEmail  contextKey = "email"
 )
 
-func AuthMiddleware(authClient *authgrpc.AuthClient) func(http.Handler) http.Handler{
+func AuthMiddleware(authClient *authgrpc.AuthClient) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
@@ -60,7 +60,7 @@ func AuthMiddleware(authClient *authgrpc.AuthClient) func(http.Handler) http.Han
 			ctx := context.WithValue(r.Context(), contextKeyUserID, userID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
-}
+	}
 }
 func Logger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
