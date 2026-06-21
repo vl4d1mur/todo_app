@@ -83,6 +83,7 @@ func TestNotifier_StatusChanged_EndToEnd(t *testing.T) {
 	config.MongoUri = mongoURI
 	config.MongoDbName = "notifier_test"
 	config.MongoDbCollection = "notifications"
+	config.MongoDeadlineCollection = "task_deadlines"
 	config.NatsURL = natsURL
 	config.SmtpHost = mailhogHost
 	config.SmtpPort = mailhogSMTPPort.Port()
@@ -94,9 +95,10 @@ func TestNotifier_StatusChanged_EndToEnd(t *testing.T) {
 
 	// 6. Создаём сервис со всеми зависимостями
 	notifRepo := repository.NewNotificationRepository()
+	deadlineRepo := repository.NewDeadlineRepository()
 	smtpSvc := service.NewSMTPService()
 	mockAuth := &mockAuthClient{email: "user@example.com"}
-	notifierSvc := service.NewNotifierService(notifRepo, mockAuth, smtpSvc)
+	notifierSvc := service.NewNotifierService(notifRepo, deadlineRepo, mockAuth, smtpSvc)
 
 	// 7. Запускаем NATS consumer
 	natsConsumer, err := consumer.NewConsumer(notifierSvc)
@@ -151,4 +153,150 @@ func TestNotifier_StatusChanged_EndToEnd(t *testing.T) {
 	assert.Contains(t, bodyStr, "Test Task", "Email body should mention task title")
 	assert.True(t, strings.Contains(bodyStr, "task.status_changed") || strings.Contains(bodyStr, "Task status changed"),
 		"Email should be about status change")
+}
+
+func TestNotifier_DeadlineFlow(t *testing.T) {
+	log.InitLogger()
+	ctx := context.Background()
+
+	// CONTAINERS
+	mongoContainer, err := tcMongo.Run(ctx, "mongo:7")
+	assert.NoError(t, err)
+	defer mongoContainer.Terminate(ctx)
+
+	mongoURI, err := mongoContainer.ConnectionString(ctx)
+	assert.NoError(t, err)
+
+	natsContainer, err := tcNats.Run(ctx, "nats:2-alpine")
+	assert.NoError(t, err)
+	defer natsContainer.Terminate(ctx)
+
+	natsURL, err := natsContainer.ConnectionString(ctx)
+	assert.NoError(t, err)
+
+	// CONFIG
+
+	config.MongoUri = mongoURI
+	config.MongoDbName = "notifier_test"
+	config.MongoDbCollection = "notifications"
+	config.MongoDeadlineCollection = "task_deadlines"
+	config.NatsURL = natsURL
+
+	mongo.ConnectMongo()
+	defer mongo.CloseMongoDB()
+
+	// SERVICES
+
+	notifRepo := repository.NewNotificationRepository()
+	deadlineRepo := repository.NewDeadlineRepository()
+	smtpSvc := service.NewSMTPService()
+	mockAuth := &mockAuthClient{email: "user@example.com"}
+	notifierSvc := service.NewNotifierService(notifRepo, deadlineRepo, mockAuth, smtpSvc)
+
+	natsConsumer, err := consumer.NewConsumer(notifierSvc)
+	assert.NoError(t, err)
+	err = natsConsumer.Start()
+	assert.NoError(t, err)
+	defer natsConsumer.Close()
+
+	time.Sleep(200 * time.Millisecond)
+
+	pubConn, err := natsclient.Connect(natsURL)
+	assert.NoError(t, err)
+	defer pubConn.Close()
+
+	userID := uuid.New()
+	taskID := uuid.New()
+
+	// TASK CREATED
+
+	firstDeadline := time.Now().Add(12 * time.Hour).UTC().Truncate(time.Second)
+	createEvent := models.TaskEvent{
+		EventType: "task.created",
+		TaskID:    taskID,
+		UserID:    userID,
+		Timestamp: time.Now(),
+		Payload: map[string]any{
+			"title":    "Important task",
+			"deadline": firstDeadline.Format(time.RFC3339),
+		},
+	}
+	data, _ := json.Marshal(createEvent)
+	err = pubConn.Publish("task-events", data)
+	assert.NoError(t, err)
+	pubConn.Flush()
+
+	assert.Eventually(t, func() bool {
+		deadlines, err := deadlineRepo.GetPending(ctx)
+		if err != nil {
+			return false
+		}
+		for _, d := range deadlines {
+			if d.TaskID == taskID && d.Title == "Important task" {
+				return true
+			}
+		}
+		return false
+	}, 5*time.Second, 200*time.Millisecond, "Deadline should be saved after task.created")
+
+	// TASK UPDATED — DEADLINE CHANGED
+
+	// Помечаем как уведомлённое чтобы проверить сброс флага
+	err = deadlineRepo.MarkNotified(ctx, taskID)
+	assert.NoError(t, err)
+
+	newDeadline := firstDeadline.Add(24 * time.Hour)
+	updateEvent := models.TaskEvent{
+		EventType: "task.updated",
+		TaskID:    taskID,
+		UserID:    userID,
+		Timestamp: time.Now(),
+		Payload: map[string]any{
+			"title":    "Important task",
+			"deadline": newDeadline.Format(time.RFC3339),
+		},
+	}
+	data, _ = json.Marshal(updateEvent)
+	err = pubConn.Publish("task-events", data)
+	assert.NoError(t, err)
+	pubConn.Flush()
+
+	assert.Eventually(t, func() bool {
+		deadlines, err := deadlineRepo.GetPending(ctx)
+		if err != nil {
+			return false
+		}
+		for _, d := range deadlines {
+			if d.TaskID == taskID && !d.Notified {
+				return true
+			}
+		}
+		return false
+	}, 5*time.Second, 200*time.Millisecond, "Notified flag should be reset after deadline change")
+
+	// TASK DELETED
+
+	deleteEvent := models.TaskEvent{
+		EventType: "task.deleted",
+		TaskID:    taskID,
+		UserID:    userID,
+		Timestamp: time.Now(),
+	}
+	data, _ = json.Marshal(deleteEvent)
+	err = pubConn.Publish("task-events", data)
+	assert.NoError(t, err)
+	pubConn.Flush()
+
+	assert.Eventually(t, func() bool {
+		deadlines, err := deadlineRepo.GetPending(ctx)
+		if err != nil {
+			return false
+		}
+		for _, d := range deadlines {
+			if d.TaskID == taskID {
+				return false
+			}
+		}
+		return true
+	}, 5*time.Second, 200*time.Millisecond, "Deadline should be deleted after task.deleted")
 }

@@ -10,6 +10,7 @@ import (
 
 	"notifier_service/internal/config"
 	"notifier_service/internal/consumer"
+	"notifier_service/internal/cron"
 	"notifier_service/internal/db/mongo"
 	authgrpc "notifier_service/internal/grpc"
 	"notifier_service/internal/handlers"
@@ -33,8 +34,13 @@ func main() {
 	defer authClient.Close()
 
 	notifRepo := repository.NewNotificationRepository()
+	deadlineRepo := repository.NewDeadlineRepository()
 	smtpSvc := service.NewSMTPService()
-	notifierSvc := service.NewNotifierService(notifRepo, authClient, smtpSvc)
+	notifierSvc := service.NewNotifierService(notifRepo, deadlineRepo, authClient, smtpSvc)
+
+	deadlineChecker := cron.NewDeadlineChecker(deadlineRepo, notifierSvc, 1*time.Minute)
+	deadlineChecker.Start()
+	defer deadlineChecker.Stop()
 
 	nc, err := consumer.NewConsumer(notifierSvc)
 	if err != nil {
@@ -83,6 +89,8 @@ func main() {
 	}
 	log.Logger.Info().Msg("HTTP server stopped")
 
+	deadlineChecker.Stop()
+	log.Logger.Info().Msg("Deadline checker stopped")
 	nc.Close()
 	mongo.CloseMongoDB()
 

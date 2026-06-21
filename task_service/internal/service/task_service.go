@@ -64,7 +64,7 @@ func (s *TaskService) CreateTask(ctx context.Context, userID uuid.UUID, req dto.
 	if err := redisConn.InvalidateTasksCache(userID.String()); err != nil {
 		log.Logger.Warn().Err(err).Msg("Failed to invalidate tasks cache")
 	}
-	events.PublishTaskCreated(task.ID, task.UserID)
+	events.PublishTaskCreated(task.ID, task.UserID, task.Title, task.DeadLine)
 
 	return &task, nil
 }
@@ -90,6 +90,7 @@ func (s *TaskService) UpdateTask(ctx context.Context, taskID, userID uuid.UUID, 
 	if req.Status != nil {
 		events.PublishTaskStatusChanged(taskID, userID, string(*req.Status), task.Title)
 	}
+	events.PublishTaskUpdated(taskID, userID, task.Title, task.DeadLine)
 
 	return task, nil
 }

@@ -24,6 +24,7 @@ type TaskEvent struct {
 const (
 	EventTaskCreated       = "task.created"
 	EventTaskStatusChanged = "task.status_changed"
+	EventTaskUpdated       = "task.updated"
 	EventTaskDeleted       = "task.deleted"
 	EventNoteAdded         = "task.note_added"
 	EventNoteDeleted       = "task.note_deleted"
@@ -58,8 +59,14 @@ func CloseNATS() {
 	}
 }
 
-func PublishTaskCreated(taskID, userID uuid.UUID) {
-	publishTaskEvent(EventTaskCreated, taskID, userID, nil)
+func PublishTaskCreated(taskID, userID uuid.UUID, title string, deadline *time.Time) {
+	payload := map[string]any{
+		"title": title,
+	}
+	if deadline != nil {
+		payload["deadline"] = deadline.Format(time.RFC3339)
+	}
+	publishTaskEvent(EventTaskCreated, taskID, userID, payload)
 }
 
 func PublishTaskStatusChanged(taskID, userID uuid.UUID, newStatus, title string) {
@@ -67,6 +74,16 @@ func PublishTaskStatusChanged(taskID, userID uuid.UUID, newStatus, title string)
 		"new_status": newStatus,
 		"title":      title,
 	})
+}
+
+func PublishTaskUpdated(taskID, userID uuid.UUID, title string, deadline *time.Time) {
+	payload := map[string]any{
+		"title": title,
+	}
+	if deadline != nil {
+		payload["deadline"] = deadline.Format(time.RFC3339)
+	}
+	publishTaskEvent("task.updated", taskID, userID, payload)
 }
 
 func PublishTaskDeadlineApproaching(taskID, userID uuid.UUID, title, deadline string) {

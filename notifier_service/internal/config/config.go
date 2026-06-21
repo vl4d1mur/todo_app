@@ -20,6 +20,7 @@ var (
 	MongoUri          string
 	MongoDbName       string
 	MongoDbCollection string
+	MongoDeadlineCollection string
 	NatsURL           string
 	AuthGrpcAddr      string
 	SmtpHost          string
@@ -37,6 +38,7 @@ func LoadConfig() {
 	MongoUri = getEnv("MONGO_URI", "mongodb://localhost:27017")
 	MongoDbName = getEnv("MONGO_DB_NAME", "notifier_db")
 	MongoDbCollection = getEnv("MONGO_COLLECTION", "notifications")
+	MongoDeadlineCollection = getEnv("MONGO_DEADLINE_COLLECTION", "task_deadlines")
 	NatsURL = getEnv("NATS_URL", "nats://localhost:4222")
 	AuthGrpcAddr = getEnv("AUTH_GRPC_ADDR", "localhost:50051")
 	SmtpHost = getEnv("SMTP_HOST", "0.0.0.0")

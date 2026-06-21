@@ -16,8 +16,6 @@ type TaskRepository interface {
 	GetTaskByID(ctx context.Context, taskID, userID uuid.UUID) (*models.Task, error)
 	UpdateTask(ctx context.Context, taskID, userID uuid.UUID, req dto.UpdateTaskRequest) error
 	DeleteTask(ctx context.Context, taskID, userID uuid.UUID) error
-	GetTasksWithUpcomingDeadline(ctx context.Context) ([]models.Task, error)
-	MarkDeadlineNotified(ctx context.Context, taskID uuid.UUID) error
 }
 
 type NoteRepository interface {

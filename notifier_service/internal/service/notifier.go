@@ -14,20 +14,23 @@ import (
 )
 
 type NotifierService struct {
-	repo       repository.NotificationRepository
-	authClient AuthClient
-	smtp       *SMTPService
+	repo         repository.NotificationRepository
+	deadlineRepo repository.DeadlineRepository
+	authClient   AuthClient
+	smtp         *SMTPService
 }
 
 func NewNotifierService(
 	repo repository.NotificationRepository,
+	deadlineRepo repository.DeadlineRepository,
 	authClient AuthClient,
 	smtp *SMTPService,
 ) *NotifierService {
 	return &NotifierService{
-		repo:       repo,
-		authClient: authClient,
-		smtp:       smtp,
+		repo:         repo,
+		deadlineRepo: deadlineRepo,
+		authClient:   authClient,
+		smtp:         smtp,
 	}
 }
 
@@ -91,6 +94,34 @@ func (s *NotifierService) HandleDeadlineApproaching(ctx context.Context, userID,
 	body := fmt.Sprintf("Hello, Your task \"%s\" is due soon: %s", taskTitle, deadline)
 
 	return s.createAndSend(ctx, userID, taskID, "task.deadline_approaching", email, subject, body)
+}
+
+func (s *NotifierService) HandleTaskMutation(ctx context.Context, userID, taskID uuid.UUID, title string, deadline *time.Time) error {
+	if deadline == nil {
+		return s.deadlineRepo.DeleteByTaskID(ctx, taskID)
+	}
+
+	deadlineEntry := &models.TaskDeadline{
+		TaskID:   taskID,
+		UserID:   userID,
+		Title:    title,
+		Deadline: *deadline,
+	}
+
+	if err := s.deadlineRepo.Upsert(ctx, deadlineEntry); err != nil {
+		log.Logger.Error().Err(err).Msg("Failed to upsert deadline")
+		return err
+	}
+
+	return nil
+}
+
+func (s *NotifierService) HandleTaskDeletion(ctx context.Context, taskID uuid.UUID) error {
+	if err := s.deadlineRepo.DeleteByTaskID(ctx, taskID); err != nil {
+		log.Logger.Error().Err(err).Msg("Failed to delete deadline")
+		return err
+	}
+	return nil
 }
 
 func (s *NotifierService) GetByUserID(ctx context.Context, userID uuid.UUID, q pagination.Query) ([]models.Notification, int64, error) {

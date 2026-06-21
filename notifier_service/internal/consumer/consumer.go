@@ -55,6 +55,10 @@ func (c *Consumer) handleMessage(msg *nats.Msg) {
 		c.handleStatusChanged(ctx, event)
 	case "task.deadline_approaching":
 		c.handleDeadlineApproaching(ctx, event)
+	case "task.created", "task.updated":
+		c.handleTaskMutation(ctx, event)
+	case "task.deleted":
+		c.handleTaskDeletion(ctx, event)
 	default:
 		log.Logger.Debug().Str("event_type", event.EventType).Msg("Event ignored")
 	}
@@ -88,6 +92,38 @@ func (c *Consumer) handleDeadlineApproaching(ctx context.Context, event models.T
 
 	if err := c.notifier.HandleDeadlineApproaching(ctx, event.UserID, event.TaskID, taskTitle, deadline); err != nil {
 		log.Logger.Error().Err(err).Msg("Failed to handle deadline_approaching")
+	}
+}
+
+func (c *Consumer) handleTaskMutation(ctx context.Context, event models.TaskEvent) {
+	title, _ := event.Payload["title"].(string)
+	deadlineStr, hasDeadline := event.Payload["deadline"].(string)
+
+	if title == "" {
+		log.Logger.Warn().
+			Str("task_id", event.TaskID.String()).
+			Msg("Missing title in task mutation event")
+		return
+	}
+
+	var deadline *time.Time
+	if hasDeadline && deadlineStr != "" {
+		parsed, err := time.Parse(time.RFC3339, deadlineStr)
+		if err != nil {
+			log.Logger.Warn().Err(err).Msg("Invalid deadline format in event")
+			return
+		}
+		deadline = &parsed
+	}
+
+	if err := c.notifier.HandleTaskMutation(ctx, event.UserID, event.TaskID, title, deadline); err != nil {
+		log.Logger.Error().Err(err).Msg("Failed to handle task mutation")
+	}
+}
+
+func (c *Consumer) handleTaskDeletion(ctx context.Context, event models.TaskEvent) {
+	if err := c.notifier.HandleTaskDeletion(ctx, event.TaskID); err != nil {
+		log.Logger.Error().Err(err).Msg("Failed to handle task deletion")
 	}
 }
 

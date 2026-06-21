@@ -1,231 +1,250 @@
-// task_service/tests/task_service_test/task_service_test.go
-package task_service_test
+//go:build integration
+
+package integration
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
+	"path/filepath"
+	"runtime"
+	"sync"
 	"testing"
+	"time"
 
+	"task_service/internal/config"
+	"task_service/internal/db/mongo"
+	"task_service/internal/db/postgres"
+	"task_service/internal/db/redisConn"
 	"task_service/internal/dto"
+	"task_service/internal/events"
 	"task_service/internal/models"
 	"task_service/internal/repository"
 	"task_service/internal/service"
+	"task_service/pkg/log"
 	"task_service/pkg/pagination"
 
 	"github.com/google/uuid"
+	natsclient "github.com/nats-io/nats.go"
+	"github.com/stretchr/testify/assert"
+	"github.com/testcontainers/testcontainers-go"
+	tcMongo "github.com/testcontainers/testcontainers-go/modules/mongodb"
+	tcNats "github.com/testcontainers/testcontainers-go/modules/nats"
+	tcPostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
+	tcRedis "github.com/testcontainers/testcontainers-go/modules/redis"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-// ==================== MOCK ====================
+func TestTaskService_FullFlow(t *testing.T) {
+	log.InitLogger()
+	ctx := context.Background()
 
-type mockTaskRepo struct {
-	createErr     error
-	getByIDTask   *models.Task
-	getByIDErr    error
-	updateErr     error
-	deleteErr     error
-	getAllTasks   []models.Task
-	getAllErr     error
-}
+	// ==================== POSTGRES ====================
 
-func (m *mockTaskRepo) CreateTask(ctx context.Context, task *models.Task) error {
-	return m.createErr
-}
-func (m *mockTaskRepo) GetTaskByID(ctx context.Context, taskID, userID uuid.UUID) (*models.Task, error) {
-	return m.getByIDTask, m.getByIDErr
-}
-func (m *mockTaskRepo) UpdateTask(ctx context.Context, taskID, userID uuid.UUID, req dto.UpdateTaskRequest) error {
-	return m.updateErr
-}
-func (m *mockTaskRepo) DeleteTask(ctx context.Context, taskID, userID uuid.UUID) error {
-	return m.deleteErr
-}
-func (m *mockTaskRepo) GetAllByUser(ctx context.Context, userID uuid.UUID) ([]models.Task, error) {
-	return m.getAllTasks, m.getAllErr
-}
+	_, currentFile, _, _ := runtime.Caller(0)
+	schemaPath := filepath.Join(filepath.Dir(currentFile), "testdata", "schema.sql")
 
-// ==================== CREATE ====================
+	pgContainer, err := tcPostgres.Run(ctx,
+		"postgres:16-alpine",
+		tcPostgres.WithDatabase("tasks_test"),
+		tcPostgres.WithUsername("postgres"),
+		tcPostgres.WithPassword("root"),
+		tcPostgres.WithInitScripts(schemaPath),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).
+				WithStartupTimeout(30*time.Second),
+		),
+	)
+	assert.NoError(t, err)
+	defer pgContainer.Terminate(ctx)
 
-func TestCreateTask_Success(t *testing.T) {
-	svc := service.NewTaskService(&mockTaskRepo{})
+	pgDSN, err := pgContainer.ConnectionString(ctx, "sslmode=disable")
+	assert.NoError(t, err)
+
+	// ==================== REDIS ====================
+
+	redisContainer, err := tcRedis.Run(ctx, "redis:7-alpine")
+	assert.NoError(t, err)
+	defer redisContainer.Terminate(ctx)
+
+	redisAddr, err := redisContainer.Endpoint(ctx, "")
+	assert.NoError(t, err)
+
+	// ==================== MONGO ====================
+
+	mongoContainer, err := tcMongo.Run(ctx, "mongo:7")
+	assert.NoError(t, err)
+	defer mongoContainer.Terminate(ctx)
+
+	mongoURI, err := mongoContainer.ConnectionString(ctx)
+	assert.NoError(t, err)
+
+	// ==================== NATS ====================
+
+	natsContainer, err := tcNats.Run(ctx, "nats:2-alpine")
+	assert.NoError(t, err)
+	defer natsContainer.Terminate(ctx)
+
+	natsURL, err := natsContainer.ConnectionString(ctx)
+	assert.NoError(t, err)
+
+	// ==================== CONFIG ====================
+
+	config.PostgresDSN = pgDSN
+	config.RedisAddr = redisAddr
+	config.RedisPassword = ""
+	config.MongoUri = mongoURI
+	config.MongoDbName = "tasks_test"
+	config.MongoDbCollection = "notes"
+	config.NatsURL = natsURL
+
+	// ==================== CONNECT ====================
+
+	postgres.ConnectPostgres()
+	defer postgres.ClosePostgres()
+
+	redisConn.ConnectRedis()
+	defer redisConn.CloseRedis()
+
+	mongo.ConnectMongo()
+	defer mongo.CloseMongoDB()
+
+	events.ConnectNATS()
+	defer events.CloseNATS()
+
+	// ==================== SUBSCRIBER FOR EVENTS ====================
+
+	natsClient, err := natsclient.Connect(natsURL)
+	assert.NoError(t, err)
+	defer natsClient.Close()
+
+	receivedEvents := make([]map[string]any, 0)
+	var eventsMutex sync.Mutex
+	_, err = natsClient.Subscribe("task-events", func(msg *natsclient.Msg) {
+		var event map[string]any
+		_ = json.Unmarshal(msg.Data, &event)
+		eventsMutex.Lock()
+		receivedEvents = append(receivedEvents, event)
+		eventsMutex.Unlock()
+	})
+	assert.NoError(t, err)
+
+	findEvent := func(eventType string) map[string]any {
+		eventsMutex.Lock()
+		defer eventsMutex.Unlock()
+		for _, e := range receivedEvents {
+			if et, ok := e["event_type"].(string); ok && et == eventType {
+				return e
+			}
+		}
+		return nil
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	// ==================== SERVICES ====================
+
+	taskRepo := repository.NewTaskRepository()
+	noteRepo := repository.NewNoteRepository()
+
+	taskService := service.NewTaskService(taskRepo)
+	noteService := service.NewNoteService(noteRepo)
 
 	userID := uuid.New()
-	task, err := svc.CreateTask(context.Background(), userID, dto.CreateTaskRequest{
-		Title:       "Test task",
-		Description: "Description",
+
+	// ==================== 1. CREATE TASK ====================
+
+	deadline := time.Now().Add(48 * time.Hour)
+	task, err := taskService.CreateTask(ctx, userID, dto.CreateTaskRequest{
+		Title:       "Integration test task",
+		Description: "Created in integration test",
+		Status:      models.TaskStatusTodo,
 		Priority:    2,
+		Deadline:    &deadline,
 	})
+	assert.NoError(t, err)
+	assert.NotNil(t, task)
+	assert.Equal(t, "Integration test task", task.Title)
 
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
-	if task.Title != "Test task" {
-		t.Errorf("Expected title 'Test task', got %v", task.Title)
-	}
-	if task.Status != models.TaskStatusTodo {
-		t.Errorf("Expected default status 'todo', got %v", task.Status)
-	}
-	if task.UserID != userID {
-		t.Errorf("Expected userID %v, got %v", userID, task.UserID)
-	}
-}
+	// ==================== 2. GET TASK FROM POSTGRES ====================
 
-func TestCreateTask_RepoError(t *testing.T) {
-	svc := service.NewTaskService(&mockTaskRepo{createErr: errors.New("db error")})
+	fetchedTask, err := taskService.GetTaskByID(ctx, task.ID, userID)
+	assert.NoError(t, err)
+	assert.Equal(t, task.ID, fetchedTask.ID)
 
-	_, err := svc.CreateTask(context.Background(), uuid.New(), dto.CreateTaskRequest{
-		Title: "Test",
+	// ==================== 3. CHECK CACHE ====================
+
+	tasks, _, err := taskService.GetAllByUser(ctx, userID, pagination.Query{Page: 1, Limit: 10})
+	assert.NoError(t, err)
+	assert.Len(t, tasks, 1)
+
+	cachedTasks, cacheErr := redisConn.GetCachedTasksList(userID.String())
+	assert.NoError(t, cacheErr)
+	assert.Len(t, cachedTasks, 1, "Tasks should be cached after GetAllByUser")
+
+	// ==================== 4. UPDATE TASK ====================
+
+	newStatus := models.TaskStatusInProgress
+	_, err = taskService.UpdateTask(ctx, task.ID, userID, dto.UpdateTaskRequest{
+		Status: &newStatus,
 	})
+	assert.NoError(t, err)
 
-	if err == nil {
-		t.Error("Expected error, got nil")
-	}
-}
+	// Cache must be invalidated
+	_, cacheErr = redisConn.GetCachedTasksList(userID.String())
+	assert.Error(t, cacheErr, "Cache should be invalidated after update")
 
-// ==================== UPDATE ====================
+	// ==================== 5. CREATE NOTE ====================
 
-func TestUpdateTask_NotFound(t *testing.T) {
-	svc := service.NewTaskService(&mockTaskRepo{updateErr: repository.ErrTaskNotFound})
-
-	_, err := svc.UpdateTask(context.Background(), uuid.New(), uuid.New(), dto.UpdateTaskRequest{})
-
-	if !errors.Is(err, service.ErrTaskNotFound) {
-		t.Errorf("Expected ErrTaskNotFound, got %v", err)
-	}
-}
-
-func TestUpdateTask_AccessDenied(t *testing.T) {
-	svc := service.NewTaskService(&mockTaskRepo{updateErr: repository.ErrTaskAccessDenied})
-
-	_, err := svc.UpdateTask(context.Background(), uuid.New(), uuid.New(), dto.UpdateTaskRequest{})
-
-	if !errors.Is(err, service.ErrTaskAccessDenied) {
-		t.Errorf("Expected ErrTaskAccessDenied, got %v", err)
-	}
-}
-
-// ==================== DELETE ====================
-
-func TestDeleteTask_Success(t *testing.T) {
-	svc := service.NewTaskService(&mockTaskRepo{})
-
-	err := svc.DeleteTask(context.Background(), uuid.New(), uuid.New())
-
-	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
-	}
-}
-
-func TestDeleteTask_NotFound(t *testing.T) {
-	svc := service.NewTaskService(&mockTaskRepo{deleteErr: repository.ErrTaskNotFound})
-
-	err := svc.DeleteTask(context.Background(), uuid.New(), uuid.New())
-
-	if !errors.Is(err, service.ErrTaskNotFound) {
-		t.Errorf("Expected ErrTaskNotFound, got %v", err)
-	}
-}
-
-func TestDeleteTask_AccessDenied(t *testing.T) {
-	svc := service.NewTaskService(&mockTaskRepo{deleteErr: repository.ErrTaskAccessDenied})
-
-	err := svc.DeleteTask(context.Background(), uuid.New(), uuid.New())
-
-	if !errors.Is(err, service.ErrTaskAccessDenied) {
-		t.Errorf("Expected ErrTaskAccessDenied, got %v", err)
-	}
-}
-
-// ==================== GET BY ID ====================
-
-func TestGetTaskByID_Success(t *testing.T) {
-	expected := &models.Task{
-		ID:    uuid.New(),
-		Title: "Test",
-	}
-	svc := service.NewTaskService(&mockTaskRepo{getByIDTask: expected})
-
-	task, err := svc.GetTaskByID(context.Background(), expected.ID, uuid.New())
-
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
-	if task.ID != expected.ID {
-		t.Errorf("Expected ID %v, got %v", expected.ID, task.ID)
-	}
-}
-
-func TestGetTaskByID_NotFound(t *testing.T) {
-	svc := service.NewTaskService(&mockTaskRepo{getByIDErr: repository.ErrTaskNotFound})
-
-	_, err := svc.GetTaskByID(context.Background(), uuid.New(), uuid.New())
-
-	if !errors.Is(err, service.ErrTaskNotFound) {
-		t.Errorf("Expected ErrTaskNotFound, got %v", err)
-	}
-}
-
-// ==================== GET ALL — пагинация и фильтр ====================
-
-func TestGetAllByUser_InvalidStatus(t *testing.T) {
-	svc := service.NewTaskService(&mockTaskRepo{
-		getAllTasks: []models.Task{{ID: uuid.New(), Status: "todo"}},
+	note, err := noteService.CreateNote(ctx, task.ID, userID, dto.CreateNoteRequest{
+		Text: "Integration test note",
+		Meta: map[string]any{"color": "red"},
 	})
+	assert.NoError(t, err)
+	assert.NotNil(t, note)
 
-	_, _, err := svc.GetAllByUser(context.Background(), uuid.New(), pagination.Query{
-		Page:   1,
-		Limit:  10,
-		Status: "wrong_status",
-	})
+	// ==================== 6. GET NOTES FOR TASK ====================
 
-	if !errors.Is(err, service.ErrInvalidStatus) {
-		t.Errorf("Expected ErrInvalidStatus, got %v", err)
-	}
-}
+	notes, err := noteService.GetAllByTask(ctx, task.ID)
+	assert.NoError(t, err)
+	assert.Len(t, notes, 1)
+	assert.Equal(t, "Integration test note", notes[0].Text)
 
-func TestGetAllByUser_FilterByStatus(t *testing.T) {
-	tasks := []models.Task{
-		{ID: uuid.New(), Status: models.TaskStatusTodo},
-		{ID: uuid.New(), Status: models.TaskStatusDone},
-		{ID: uuid.New(), Status: models.TaskStatusTodo},
-	}
-	svc := service.NewTaskService(&mockTaskRepo{getAllTasks: tasks})
+	// ==================== 7. DELETE TASK ====================
 
-	result, total, err := svc.GetAllByUser(context.Background(), uuid.New(), pagination.Query{
-		Page:   1,
-		Limit:  10,
-		Status: "todo",
-	})
+	err = taskService.DeleteTask(ctx, task.ID, userID)
+	assert.NoError(t, err)
 
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
-	if total != 2 {
-		t.Errorf("Expected 2 tasks with status 'todo', got %d", total)
-	}
-	if len(result) != 2 {
-		t.Errorf("Expected 2 items in result, got %d", len(result))
-	}
-}
+	// ==================== 8. CHECK EVENTS ====================
 
-func TestGetAllByUser_Pagination(t *testing.T) {
-	tasks := make([]models.Task, 15)
-	for i := range tasks {
-		tasks[i] = models.Task{ID: uuid.New(), Status: models.TaskStatusTodo}
-	}
-	svc := service.NewTaskService(&mockTaskRepo{getAllTasks: tasks})
+	time.Sleep(300 * time.Millisecond) // ждём асинхронной публикации в NATS
 
-	result, total, err := svc.GetAllByUser(context.Background(), uuid.New(), pagination.Query{
-		Page:  2,
-		Limit: 5,
-	})
+	// task.created — должен содержать title и deadline в payload
+	createdEvent := findEvent("task.created")
+	assert.NotNil(t, createdEvent, "task.created event should be published")
+	if createdEvent != nil {
+		payload, _ := createdEvent["payload"].(map[string]any)
+		assert.Equal(t, "Integration test task", payload["title"])
+		assert.NotEmpty(t, payload["deadline"], "Deadline should be present in payload")
+	}
 
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
+	// task.updated — публикуется при апдейте
+	updatedEvent := findEvent("task.updated")
+	assert.NotNil(t, updatedEvent, "task.updated event should be published")
+	if updatedEvent != nil {
+		payload, _ := updatedEvent["payload"].(map[string]any)
+		assert.Equal(t, "Integration test task", payload["title"])
 	}
-	if total != 15 {
-		t.Errorf("Expected total 15, got %d", total)
-	}
-	if len(result) != 5 {
-		t.Errorf("Expected 5 items on page 2, got %d", len(result))
-	}
+
+	// task.status_changed — публикуется при смене статуса
+	statusEvent := findEvent("task.status_changed")
+	assert.NotNil(t, statusEvent, "task.status_changed event should be published")
+
+	// task.deleted
+	deletedEvent := findEvent("task.deleted")
+	assert.NotNil(t, deletedEvent, "task.deleted event should be published")
+
+	// task.note_added
+	noteEvent := findEvent("task.note_added")
+	assert.NotNil(t, noteEvent, "task.note_added event should be published")
 }

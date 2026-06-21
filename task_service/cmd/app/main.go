@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"task_service/internal/config"
-	"task_service/internal/cron"
 	"task_service/internal/db/mongo"
 	"task_service/internal/db/postgres"
 	"task_service/internal/db/redisConn"
@@ -34,9 +33,6 @@ func main() {
 
 	taskRepo := repository.NewTaskRepository()
 	noteRepo := repository.NewNoteRepository()
-
-	deadlineChecker := cron.NewDeadlineChecker(taskRepo, 1*time.Minute)
-	deadlineChecker.Start()
 
 	taskSvc := service.NewTaskService(taskRepo)
 	noteSvc := service.NewNoteService(noteRepo)
@@ -90,8 +86,7 @@ func main() {
 		log.Logger.Error().Err(err).Msg("HTTP server shutdown error:")
 	}
 	log.Logger.Info().Msg("HTTP server stoped")
-
-	deadlineChecker.Stop()
+	
 	postgres.ClosePostgres()
 	redisConn.CloseRedis()
 	mongo.CloseMongoDB()
