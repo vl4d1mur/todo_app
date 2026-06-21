@@ -1,6 +1,6 @@
 # Todo App — Микросервисное приложение
 
-REST API для управления задачами и заметками с микросервисной архитектурой, событийной коммуникацией и email-уведомлениями.
+REST API приложение для управления задачами и заметками с микросервисной архитектурой, событийной коммуникацией и email+telegram-уведомлениями.
 
 ## Архитектура
 
@@ -61,7 +61,7 @@ graph TB
     NATS -->|subscribe task-events| Notifier
 ```
 
-### Sequence — изменение статуса задачи
+### Sequence — прецедент изменение статуса задачи
 
 ```mermaid
 sequenceDiagram
@@ -107,7 +107,7 @@ sequenceDiagram
     end
 ```
 
-### Sequence — уведомление о приближении дедлайна
+### Sequence — прецедент уведомление о приближении дедлайна
 
 ```mermaid
 sequenceDiagram
@@ -206,6 +206,7 @@ AUTH_GRPC_ADDR=auth_service:50051
 SMTP_HOST=mailhog
 SMTP_PORT=1025
 SMTP_FROM=noreply@todo.local
+TELEGRAM_BOT_TOKEN=(token)
 APP_ENV=development
 ```
 
