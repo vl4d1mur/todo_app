@@ -6,7 +6,8 @@ option go_package = "auth_service/pkg/pb;pb";
 
 service AuthService {
   rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
-  rpc GetUserEmail(GetUserEmailRequest) returns (GetUserEmailResponse);
+  rpc ActivateTelegram(ActivateTelegramRequest) returns (ActivateTelegramResponse);
+  rpc GetUserContacts(GetUserContactsRequest) returns (GetUserContactsResponse);
 }
 
 message ValidateTokenRequest {
@@ -19,11 +20,24 @@ message ValidateTokenResponse {
   string error = 3;
 }
 
-message GetUserEmailRequest {
+message ActivateTelegramRequest {
+  string code = 1;
+  int64 chat_id = 2;
+}
+
+message ActivateTelegramResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message GetUserContactsRequest {
   string user_id = 1;
 }
 
-message GetUserEmailResponse {
+message GetUserContactsResponse {
   string email = 1;
-  string error = 2;
+  int64 telegram_chat_id = 2;
+  bool has_telegram = 3;
+  string error = 4;
 }
+

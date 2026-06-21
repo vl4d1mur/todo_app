@@ -7,10 +7,11 @@ import (
 )
 
 type User struct {
-	ID        uuid.UUID `json:"id" db:"id"`
-	Email     string    `json:"email" db:"email"`
-	Password  string    `json:"-" db:"password"`
-	Name      string    `json:"name" db:"name"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+	ID             uuid.UUID `json:"id" db:"id"`
+	Email          string    `json:"email" db:"email"`
+	TelegramChatID *int64    `json:"telegram_chat_id,omitempty" db:"telegram_chat_id"`
+	Password       string    `json:"-" db:"password"`
+	Name           string    `json:"name" db:"name"`
+	CreatedAt      time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at" db:"updated_at"`
 }

@@ -19,8 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AuthService_ValidateToken_FullMethodName = "/auth.AuthService/ValidateToken"
-	AuthService_GetUserEmail_FullMethodName  = "/auth.AuthService/GetUserEmail"
+	AuthService_ValidateToken_FullMethodName    = "/auth.AuthService/ValidateToken"
+	AuthService_ActivateTelegram_FullMethodName = "/auth.AuthService/ActivateTelegram"
+	AuthService_GetUserContacts_FullMethodName  = "/auth.AuthService/GetUserContacts"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -28,7 +29,8 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AuthServiceClient interface {
 	ValidateToken(ctx context.Context, in *ValidateTokenRequest, opts ...grpc.CallOption) (*ValidateTokenResponse, error)
-	GetUserEmail(ctx context.Context, in *GetUserEmailRequest, opts ...grpc.CallOption) (*GetUserEmailResponse, error)
+	ActivateTelegram(ctx context.Context, in *ActivateTelegramRequest, opts ...grpc.CallOption) (*ActivateTelegramResponse, error)
+	GetUserContacts(ctx context.Context, in *GetUserContactsRequest, opts ...grpc.CallOption) (*GetUserContactsResponse, error)
 }
 
 type authServiceClient struct {
@@ -49,10 +51,20 @@ func (c *authServiceClient) ValidateToken(ctx context.Context, in *ValidateToken
 	return out, nil
 }
 
-func (c *authServiceClient) GetUserEmail(ctx context.Context, in *GetUserEmailRequest, opts ...grpc.CallOption) (*GetUserEmailResponse, error) {
+func (c *authServiceClient) ActivateTelegram(ctx context.Context, in *ActivateTelegramRequest, opts ...grpc.CallOption) (*ActivateTelegramResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetUserEmailResponse)
-	err := c.cc.Invoke(ctx, AuthService_GetUserEmail_FullMethodName, in, out, cOpts...)
+	out := new(ActivateTelegramResponse)
+	err := c.cc.Invoke(ctx, AuthService_ActivateTelegram_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) GetUserContacts(ctx context.Context, in *GetUserContactsRequest, opts ...grpc.CallOption) (*GetUserContactsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetUserContactsResponse)
+	err := c.cc.Invoke(ctx, AuthService_GetUserContacts_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +76,8 @@ func (c *authServiceClient) GetUserEmail(ctx context.Context, in *GetUserEmailRe
 // for forward compatibility.
 type AuthServiceServer interface {
 	ValidateToken(context.Context, *ValidateTokenRequest) (*ValidateTokenResponse, error)
-	GetUserEmail(context.Context, *GetUserEmailRequest) (*GetUserEmailResponse, error)
+	ActivateTelegram(context.Context, *ActivateTelegramRequest) (*ActivateTelegramResponse, error)
+	GetUserContacts(context.Context, *GetUserContactsRequest) (*GetUserContactsResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -78,8 +91,11 @@ type UnimplementedAuthServiceServer struct{}
 func (UnimplementedAuthServiceServer) ValidateToken(context.Context, *ValidateTokenRequest) (*ValidateTokenResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ValidateToken not implemented")
 }
-func (UnimplementedAuthServiceServer) GetUserEmail(context.Context, *GetUserEmailRequest) (*GetUserEmailResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetUserEmail not implemented")
+func (UnimplementedAuthServiceServer) ActivateTelegram(context.Context, *ActivateTelegramRequest) (*ActivateTelegramResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ActivateTelegram not implemented")
+}
+func (UnimplementedAuthServiceServer) GetUserContacts(context.Context, *GetUserContactsRequest) (*GetUserContactsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetUserContacts not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 func (UnimplementedAuthServiceServer) testEmbeddedByValue()                     {}
@@ -120,20 +136,38 @@ func _AuthService_ValidateToken_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
-func _AuthService_GetUserEmail_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetUserEmailRequest)
+func _AuthService_ActivateTelegram_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ActivateTelegramRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AuthServiceServer).GetUserEmail(ctx, in)
+		return srv.(AuthServiceServer).ActivateTelegram(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: AuthService_GetUserEmail_FullMethodName,
+		FullMethod: AuthService_ActivateTelegram_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AuthServiceServer).GetUserEmail(ctx, req.(*GetUserEmailRequest))
+		return srv.(AuthServiceServer).ActivateTelegram(ctx, req.(*ActivateTelegramRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_GetUserContacts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetUserContactsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).GetUserContacts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_GetUserContacts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).GetUserContacts(ctx, req.(*GetUserContactsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -150,8 +184,12 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _AuthService_ValidateToken_Handler,
 		},
 		{
-			MethodName: "GetUserEmail",
-			Handler:    _AuthService_GetUserEmail_Handler,
+			MethodName: "ActivateTelegram",
+			Handler:    _AuthService_ActivateTelegram_Handler,
+		},
+		{
+			MethodName: "GetUserContacts",
+			Handler:    _AuthService_GetUserContacts_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

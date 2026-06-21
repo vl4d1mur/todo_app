@@ -13,6 +13,7 @@ type UserRepository interface {
 	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
 	ExistByEmail(ctx context.Context, email string) (bool, error)
 	CreateUser(ctx context.Context, user *models.User) error
+	UpdateTelegramChatID(ctx context.Context, userID uuid.UUID, chatID int64) error
 }
 
 type SessionRepository interface {

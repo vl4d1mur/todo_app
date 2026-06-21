@@ -86,7 +86,7 @@ func main() {
 		log.Logger.Error().Err(err).Msg("HTTP server shutdown error:")
 	}
 	log.Logger.Info().Msg("HTTP server stoped")
-	
+
 	postgres.ClosePostgres()
 	redisConn.CloseRedis()
 	mongo.CloseMongoDB()

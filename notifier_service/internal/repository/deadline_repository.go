@@ -7,6 +7,7 @@ import (
 	"notifier_service/internal/config"
 	"notifier_service/internal/db/mongo"
 	"notifier_service/internal/models"
+	"notifier_service/pkg/log"
 
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -32,6 +33,13 @@ func (r *DeadlineRepositoryImpl) Upsert(ctx context.Context, d *models.TaskDeadl
 
 	var existing models.TaskDeadline
 	err := r.collection().FindOne(ctx, bson.M{"task_id": d.TaskID}).Decode(&existing)
+
+	log.Logger.Info().
+		Bool("err_is_nil", err == nil).
+		Str("existing_deadline", existing.Deadline.Format(time.RFC3339Nano)).
+		Str("new_deadline", d.Deadline.Format(time.RFC3339Nano)).
+		Bool("equal", existing.Deadline.Equal(d.Deadline)).
+		Msg("upsert check")
 
 	deadlineChanged := err == mongodriver.ErrNoDocuments || !existing.Deadline.Equal(d.Deadline)
 
@@ -88,7 +96,7 @@ func (r *DeadlineRepositoryImpl) MarkNotified(ctx context.Context, taskID uuid.U
 	_, err := r.collection().UpdateOne(
 		ctx,
 		bson.M{"task_id": taskID},
-		bson.M{"$set": bson.M{"notofied": true}},
+		bson.M{"$set": bson.M{"notified": true}},
 	)
 	return err
 }

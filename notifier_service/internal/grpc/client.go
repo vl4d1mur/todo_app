@@ -86,20 +86,35 @@ func warmupConnection(client pb.AuthServiceClient) error {
 	return fmt.Errorf("failed to establish gRPC connection after 10 attempts")
 }
 
-func (c *AuthClient) GetUserEmail(ctx context.Context, userID string) (string, error) {
+func (c *AuthClient) ActivateTelegram(ctx context.Context, code string, chatID int64) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	resp, err := c.client.ActivateTelegram(ctx, &pb.ActivateTelegramRequest{
+		Code:   code,
+		ChatId: chatID,
+	})
+	if err != nil {
+		return false, fmt.Errorf("gRPC ActivateTelegram error: %w", err)
+	}
+
+	return resp.Success, nil
+}
+
+func (c *AuthClient) GetUserContacts(ctx context.Context, userID string) (string, int64, bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
-	resp, err := c.client.GetUserEmail(ctx, &pb.GetUserEmailRequest{UserId: userID})
+	resp, err := c.client.GetUserContacts(ctx, &pb.GetUserContactsRequest{UserId: userID})
 	if err != nil {
-		return "", fmt.Errorf("gRPC GetUserEmail error: %w", err)
+		return "", 0, false, fmt.Errorf("gRPC GetUserContacts error: %w", err)
 	}
 
 	if resp.Error != "" {
-		return "", fmt.Errorf("email lookup failed: %s", resp.Error)
+		return "", 0, false, fmt.Errorf("contacts lookup failed: %s", resp.Error)
 	}
 
-	return resp.Email, nil
+	return resp.Email, resp.TelegramChatId, resp.HasTelegram, nil
 }
 
 func (c *AuthClient) ValidateToken(ctx context.Context, token string) (string, error) {

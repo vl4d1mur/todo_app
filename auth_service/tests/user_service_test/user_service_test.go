@@ -44,6 +44,10 @@ func (m *mockUserRepo) GetUserByID(ctx context.Context, id uuid.UUID) (*models.U
 	return m.userByID, m.userByIDErr
 }
 
+func (m *mockUserRepo) UpdateTelegramChatID(ctx context.Context, userID uuid.UUID, chatID int64) error {
+	return nil
+}
+
 type mockSessionRepo struct {
 	createErr error
 	session   *models.Session

@@ -25,8 +25,8 @@ func NewUserRepository() *UserRepositoryImpl {
 
 func (r *UserRepositoryImpl) GetUserByID(ctx context.Context, userID uuid.UUID) (*models.User, error) {
 	var u models.User
-	err := postgres.DB.QueryRow(ctx, `SELECT id, email, name, created_at, updated_at FROM users WHERE id = $1`,
-		userID).Scan(&u.ID, &u.Email, &u.Name, &u.CreatedAt, &u.UpdatedAt)
+	err := postgres.DB.QueryRow(ctx, `SELECT id, email, name, telegram_chat_id, created_at, updated_at FROM users WHERE id = $1`,
+		userID).Scan(&u.ID, &u.Email, &u.Name, &u.TelegramChatID, &u.CreatedAt, &u.UpdatedAt)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -67,5 +67,12 @@ func (r *UserRepositoryImpl) CreateUser(ctx context.Context, user *models.User) 
 	_, err := postgres.DB.Exec(ctx, `INSERT INTO users (id, email, password, name, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)`,
 		user.ID, user.Email, user.Password, user.Name, user.CreatedAt, user.UpdatedAt)
 
+	return err
+}
+
+func (r *UserRepositoryImpl) UpdateTelegramChatID(ctx context.Context, userID uuid.UUID, chatID int64) error {
+	_, err := postgres.DB.Exec(ctx,
+		"UPDATE users SET telegram_chat_id = $1, updated_at = NOW() WHERE id = $2",
+		chatID, userID)
 	return err
 }

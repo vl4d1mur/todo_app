@@ -18,6 +18,7 @@ type NotifierService struct {
 	deadlineRepo repository.DeadlineRepository
 	authClient   AuthClient
 	smtp         *SMTPService
+	telegram     *TelegramChannel
 }
 
 func NewNotifierService(
@@ -25,16 +26,18 @@ func NewNotifierService(
 	deadlineRepo repository.DeadlineRepository,
 	authClient AuthClient,
 	smtp *SMTPService,
+	telegram *TelegramChannel,
 ) *NotifierService {
 	return &NotifierService{
 		repo:         repo,
 		deadlineRepo: deadlineRepo,
 		authClient:   authClient,
 		smtp:         smtp,
+		telegram:     telegram,
 	}
 }
 
-func (s *NotifierService) createAndSend(
+func (s *NotifierService) sendEmail(
 	ctx context.Context,
 	userID, taskID uuid.UUID,
 	eventType, recipient, subject, body string,
@@ -70,30 +73,76 @@ func (s *NotifierService) createAndSend(
 	return nil
 }
 
+func (s *NotifierService) sendTelegram(ctx context.Context, userID, taskID uuid.UUID, eventType string, chatID int64, subject, body string) error {
+	notification := &models.Notification{
+		UserID:    userID,
+		TaskID:    taskID,
+		EventType: eventType,
+		Channel:   "telegram",
+		Recipient: fmt.Sprintf("%d", chatID),
+		Subject:   subject,
+		Body:      body,
+		Status:    models.StatusPending,
+	}
+
+	if err := s.repo.Create(ctx, notification); err != nil {
+		return err
+	}
+
+	if err := s.telegram.Send(chatID, subject, body); err != nil {
+		if updateErr := s.repo.UpdateStatus(ctx, notification.ID.Hex(), models.StatusFailed, err.Error()); updateErr != nil {
+			log.Logger.Error().Err(updateErr).Msg("Failed to update notification status to failed")
+			return err
+		}
+	}
+
+	return s.repo.UpdateStatus(ctx, notification.ID.Hex(), models.StatusSent, "")
+}
+
 func (s *NotifierService) HandleStatusChanged(ctx context.Context, userID, taskID uuid.UUID, newStatus, taskTitle string) error {
-	email, err := s.authClient.GetUserEmail(ctx, userID.String())
+	email, chatID, hasTelegram, err := s.authClient.GetUserContacts(ctx, userID.String())
 	if err != nil {
 		log.Logger.Error().Err(err).Msg("Failed to get user email")
 		return err
 	}
+
+	_ = chatID
+	_ = hasTelegram
 
 	subject := fmt.Sprintf("Task status changed: %s", taskTitle)
 	body := fmt.Sprintf("Hello, Your task \"%s\" has changed status to: %s", taskTitle, newStatus)
 
-	return s.createAndSend(ctx, userID, taskID, "task.status_changed", email, subject, body)
+	return s.sendEmail(ctx, userID, taskID, "task.status_changed", email, subject, body)
 }
 
 func (s *NotifierService) HandleDeadlineApproaching(ctx context.Context, userID, taskID uuid.UUID, taskTitle, deadline string) error {
-	email, err := s.authClient.GetUserEmail(ctx, userID.String())
+	email, chatID, hasTelegram, err := s.authClient.GetUserContacts(ctx, userID.String())
 	if err != nil {
-		log.Logger.Error().Err(err).Msg("Failed to get user email")
+		log.Logger.Error().Err(err).Msg("Failed to get user contacts")
 		return err
 	}
+	log.Logger.Info().
+		Str("email", email).
+		Int64("chat_id", chatID).
+		Bool("has_telegram", hasTelegram).
+		Msg("Got user contacts")
 
 	subject := fmt.Sprintf("Deadline approaching: %s", taskTitle)
 	body := fmt.Sprintf("Hello, Your task \"%s\" is due soon: %s", taskTitle, deadline)
 
-	return s.createAndSend(ctx, userID, taskID, "task.deadline_approaching", email, subject, body)
+	if email != "" {
+		if err := s.sendEmail(ctx, userID, taskID, "task.deadline_approaching", email, subject, body); err != nil {
+			log.Logger.Error().Err(err).Msg("Email channel failed")
+		}
+	}
+
+	if hasTelegram {
+		if err := s.sendTelegram(ctx, userID, taskID, "task.deadline_approaching", chatID, subject, body); err != nil {
+			log.Logger.Error().Err(err).Msg("Telegram channel failed")
+		}
+	}
+
+	return nil
 }
 
 func (s *NotifierService) HandleTaskMutation(ctx context.Context, userID, taskID uuid.UUID, title string, deadline *time.Time) error {

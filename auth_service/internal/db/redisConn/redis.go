@@ -8,6 +8,7 @@ import (
 	"auth_service/internal/config"
 	"auth_service/internal/models"
 	"auth_service/pkg/log"
+
 	"github.com/redis/go-redis/v9"
 )
 
@@ -16,6 +17,7 @@ var RedisClient *redis.Client
 const (
 	CacheTTLTasks   = 5 * time.Minute
 	CacheTTLProfile = 15 * time.Minute
+	TelegramCodeTTL = 10 * time.Minute
 )
 
 func ConnectRedis() {
@@ -93,4 +95,24 @@ func GetCachedUserProfile(userID string) (*models.User, error) {
 
 func InvalidateUserProfile(userID string) error {
 	return DeleteCache(UserProfileKey(userID))
+}
+
+//telegram
+
+func TelegramCodeKey(code string) string {
+	return "telegram:code:" + code
+}
+
+func SaveTelegramCode(code, userID string) error {
+	return SetCache(TelegramCodeKey(code), userID, TelegramCodeTTL)
+}
+
+func GetUserIDByCode(code string) (string, error) {
+	var userID string
+	err := GetCache(TelegramCodeKey(code), &userID)
+	return userID, err
+}
+
+func DeleteTelegramCode(code string) error {
+	return DeleteCache(TelegramCodeKey(code))
 }

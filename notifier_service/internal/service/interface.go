@@ -19,5 +19,6 @@ type NotifierServiceInterface interface {
 }
 
 type AuthClient interface {
-	GetUserEmail(ctx context.Context, userID string) (string, error)
+	GetUserContacts(ctx context.Context, userID string) (email string, chatID int64, hasTelegram bool, err error)
+	ActivateTelegram(ctx context.Context, code string, chatID int64) (bool, error)
 }

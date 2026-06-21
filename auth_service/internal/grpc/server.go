@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 
+	"auth_service/internal/db/redisConn"
 	"auth_service/internal/repository"
 	"auth_service/pkg/jwt"
 	"auth_service/pkg/pb"
@@ -34,22 +35,52 @@ func (s *AuthServer) ValidateToken(ctx context.Context, req *pb.ValidateTokenReq
 	}, nil
 }
 
-func (s *AuthServer) GetUserEmail(ctx context.Context, req *pb.GetUserEmailRequest) (*pb.GetUserEmailResponse, error) {
+func (s *AuthServer) ActivateTelegram(ctx context.Context, req *pb.ActivateTelegramRequest) (*pb.ActivateTelegramResponse, error) {
+	userIDStr, err := redisConn.GetUserIDByCode(req.Code)
+	if err != nil {
+		return &pb.ActivateTelegramResponse{
+			Success: false,
+			Error:   "invalid or expired code",
+		}, nil
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return &pb.ActivateTelegramResponse{
+			Success: false,
+			Error:   "invalid user_id in cache",
+		}, nil
+	}
+
+	if err := s.userRepo.UpdateTelegramChatID(ctx, userID, req.ChatId); err != nil {
+		return &pb.ActivateTelegramResponse{
+			Success: false,
+			Error:   "failed to save chat_id",
+		}, nil
+	}
+
+	_ = redisConn.DeleteTelegramCode(req.Code)
+
+	return &pb.ActivateTelegramResponse{Success: true}, nil
+}
+
+func (s *AuthServer) GetUserContacts(ctx context.Context, req *pb.GetUserContactsRequest) (*pb.GetUserContactsResponse, error) {
 	userID, err := uuid.Parse(req.UserId)
 	if err != nil {
-		return &pb.GetUserEmailResponse{
-			Error: "invalid user_id format",
-		}, nil
+		return &pb.GetUserContactsResponse{Error: "invalid user_id"}, nil
 	}
 
 	user, err := s.userRepo.GetUserByID(ctx, userID)
 	if err != nil {
-		return &pb.GetUserEmailResponse{
-			Error: "user not found",
-		}, nil
+		return &pb.GetUserContactsResponse{Error: "user not found"}, nil
 	}
 
-	return &pb.GetUserEmailResponse{
+	resp := &pb.GetUserContactsResponse{
 		Email: user.Email,
-	}, nil
+	}
+	if user.TelegramChatID != nil {
+		resp.TelegramChatId = *user.TelegramChatID
+		resp.HasTelegram = true
+	}
+	return resp, nil
 }

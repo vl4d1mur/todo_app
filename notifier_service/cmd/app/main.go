@@ -18,6 +18,7 @@ import (
 	"notifier_service/internal/repository"
 	"notifier_service/internal/routes"
 	"notifier_service/internal/service"
+	"notifier_service/internal/telegram"
 	"notifier_service/pkg/log"
 )
 
@@ -33,10 +34,18 @@ func main() {
 	}
 	defer authClient.Close()
 
+	bot, err := telegram.NewBot(config.TelegramBotToken, authClient)
+	if err != nil {
+		log.Logger.Fatal().Err(err).Msg("Failed to create Telegram bot")
+	}
+	bot.Start()
+	defer bot.Stop()
+
 	notifRepo := repository.NewNotificationRepository()
 	deadlineRepo := repository.NewDeadlineRepository()
 	smtpSvc := service.NewSMTPService()
-	notifierSvc := service.NewNotifierService(notifRepo, deadlineRepo, authClient, smtpSvc)
+	telegramChannel := service.NewTelegramChannel(bot)
+	notifierSvc := service.NewNotifierService(notifRepo, deadlineRepo, authClient, smtpSvc, telegramChannel)
 
 	deadlineChecker := cron.NewDeadlineChecker(deadlineRepo, notifierSvc, 1*time.Minute)
 	deadlineChecker.Start()

@@ -24,5 +24,6 @@ func SetupRoutes(h *handlers.Handler, health *health.Checker) *mux.Router {
 
 	api.HandleFunc("/logout", h.Auth.LogoutHandler).Methods("POST")
 	api.HandleFunc("/profile", h.Auth.GetProfileHandler).Methods("GET")
+	api.HandleFunc("/profile/telegram/code", h.Telegram.GenerateTelegramCodeHandler).Methods("POST")
 	return r
 }

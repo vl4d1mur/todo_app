@@ -5,15 +5,21 @@ import (
 )
 
 type Handler struct {
-	Auth *AuthHandler
+	Auth     *AuthHandler
+	Telegram *TelegramHandler
+}
+
+type TelegramHandler struct {
+	service service.TelegramServiceInterface
 }
 
 type AuthHandler struct {
 	service service.AuthServiceInterface
 }
 
-func NewHandler(authSvc service.AuthServiceInterface) *Handler {
+func NewHandler(authSvc service.AuthServiceInterface, telegramSvc service.TelegramServiceInterface) *Handler {
 	return &Handler{
-		Auth: &AuthHandler{service: authSvc},
+		Auth:     &AuthHandler{service: authSvc},
+		Telegram: &TelegramHandler{service: telegramSvc},
 	}
 }

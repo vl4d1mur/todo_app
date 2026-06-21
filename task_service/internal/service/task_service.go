@@ -49,14 +49,6 @@ func (s *TaskService) CreateTask(ctx context.Context, userID uuid.UUID, req dto.
 		task.Status = models.TaskStatusTodo
 	}
 
-	/*if task.Status != "" {
-		switch task.Status {
-		case models.TaskStatusTodo, models.TaskStatusInProgress, models.TaskStatusCancelled, models.TaskStatusDone:
-		default:
-			return nil, ErrInvalidStatus
-		}
-	}*/
-
 	if err := s.repo.CreateTask(ctx, &task); err != nil {
 		return nil, fmt.Errorf("failed to create task: %w", err)
 	}

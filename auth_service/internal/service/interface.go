@@ -16,3 +16,7 @@ type AuthServiceInterface interface {
 	RefreshToken(ctx context.Context, refreshToken string) (*dto.TokenPair, error)
 	Logout(ctx context.Context, refreshToken string) error
 }
+
+type TelegramServiceInterface interface {
+	GenerateTelegramCode(ctx context.Context, userID uuid.UUID) (string, error)
+}

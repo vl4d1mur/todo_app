@@ -36,8 +36,9 @@ func main() {
 	sessionRepo := repository.NewSessionRepository()
 
 	authSvc := service.NewAuthService(userRepo, sessionRepo)
+	telegramSvc := service.NewTelegramService()
 
-	h := handlers.NewHandler(authSvc)
+	h := handlers.NewHandler(authSvc, telegramSvc)
 
 	healthChecker := health.NewChecker(
 		postgres.DB,

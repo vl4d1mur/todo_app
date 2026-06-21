@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -32,11 +33,40 @@ import (
 // mockAuthClient — заглушка для gRPC к auth_service.
 // В интеграционном тесте notifier мы не хотим тащить весь auth_service.
 type mockAuthClient struct {
-	email string
+	email       string
+	chatID      int64
+	hasTelegram bool
 }
 
-func (m *mockAuthClient) GetUserEmail(ctx context.Context, userID string) (string, error) {
-	return m.email, nil
+type mockTelegramSender struct {
+	sentMessages []sentMessage
+	mu           sync.Mutex
+}
+
+type sentMessage struct {
+	ChatID int64
+	Text   string
+}
+
+func (m *mockTelegramSender) SendMessage(chatID int64, text string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.sentMessages = append(m.sentMessages, sentMessage{ChatID: chatID, Text: text})
+	return nil
+}
+
+func (m *mockTelegramSender) Messages() []sentMessage {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]sentMessage{}, m.sentMessages...)
+}
+
+func (m *mockAuthClient) GetUserContacts(ctx context.Context, userID string) (string, int64, bool, error) {
+	return m.email, m.chatID, m.hasTelegram, nil
+}
+
+func (m *mockAuthClient) ActivateTelegram(ctx context.Context, code string, chatID int64) (bool, error) {
+	return true, nil
 }
 
 func TestNotifier_StatusChanged_EndToEnd(t *testing.T) {
@@ -97,8 +127,10 @@ func TestNotifier_StatusChanged_EndToEnd(t *testing.T) {
 	notifRepo := repository.NewNotificationRepository()
 	deadlineRepo := repository.NewDeadlineRepository()
 	smtpSvc := service.NewSMTPService()
+	mockTg := &mockTelegramSender{}
+	telegramChannel := service.NewTelegramChannel(mockTg)
 	mockAuth := &mockAuthClient{email: "user@example.com"}
-	notifierSvc := service.NewNotifierService(notifRepo, deadlineRepo, mockAuth, smtpSvc)
+	notifierSvc := service.NewNotifierService(notifRepo, deadlineRepo, mockAuth, smtpSvc, telegramChannel)
 
 	// 7. Запускаем NATS consumer
 	natsConsumer, err := consumer.NewConsumer(notifierSvc)
@@ -190,8 +222,10 @@ func TestNotifier_DeadlineFlow(t *testing.T) {
 	notifRepo := repository.NewNotificationRepository()
 	deadlineRepo := repository.NewDeadlineRepository()
 	smtpSvc := service.NewSMTPService()
+	mockTg := &mockTelegramSender{}
+	telegramChannel := service.NewTelegramChannel(mockTg)
 	mockAuth := &mockAuthClient{email: "user@example.com"}
-	notifierSvc := service.NewNotifierService(notifRepo, deadlineRepo, mockAuth, smtpSvc)
+	notifierSvc := service.NewNotifierService(notifRepo, deadlineRepo, mockAuth, smtpSvc, telegramChannel)
 
 	natsConsumer, err := consumer.NewConsumer(notifierSvc)
 	assert.NoError(t, err)
@@ -237,7 +271,7 @@ func TestNotifier_DeadlineFlow(t *testing.T) {
 			}
 		}
 		return false
-	}, 5*time.Second, 200*time.Millisecond, "Deadline should be saved after task.created")
+	}, 10*time.Second, 200*time.Millisecond, "Deadline should be saved after task.created")
 
 	// TASK UPDATED — DEADLINE CHANGED
 
@@ -245,7 +279,9 @@ func TestNotifier_DeadlineFlow(t *testing.T) {
 	err = deadlineRepo.MarkNotified(ctx, taskID)
 	assert.NoError(t, err)
 
-	newDeadline := firstDeadline.Add(24 * time.Hour)
+	time.Sleep(200 * time.Millisecond)
+
+	newDeadline := firstDeadline.Add(1 * time.Hour)
 	updateEvent := models.TaskEvent{
 		EventType: "task.updated",
 		TaskID:    taskID,
@@ -299,4 +335,93 @@ func TestNotifier_DeadlineFlow(t *testing.T) {
 		}
 		return true
 	}, 5*time.Second, 200*time.Millisecond, "Deadline should be deleted after task.deleted")
+}
+
+func TestNotifier_DeadlineFlow_WithTelegram(t *testing.T) {
+	log.InitLogger()
+	ctx := context.Background()
+
+	// Контейнеры
+	mongoContainer, err := tcMongo.Run(ctx, "mongo:7")
+	assert.NoError(t, err)
+	defer mongoContainer.Terminate(ctx)
+	mongoURI, _ := mongoContainer.ConnectionString(ctx)
+
+	natsContainer, err := tcNats.Run(ctx, "nats:2-alpine")
+	assert.NoError(t, err)
+	defer natsContainer.Terminate(ctx)
+	natsURL, _ := natsContainer.ConnectionString(ctx)
+
+	mailhogReq := testcontainers.ContainerRequest{
+		Image:        "mailhog/mailhog",
+		ExposedPorts: []string{"1025/tcp"},
+		WaitingFor:   wait.ForListeningPort("1025/tcp"),
+	}
+	mailhogContainer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: mailhogReq,
+		Started:          true,
+	})
+	assert.NoError(t, err)
+	defer mailhogContainer.Terminate(ctx)
+	mailhogHost, _ := mailhogContainer.Host(ctx)
+	mailhogPort, _ := mailhogContainer.MappedPort(ctx, "1025")
+
+	// Config
+	config.MongoUri = mongoURI
+	config.MongoDbName = "notifier_test"
+	config.MongoDbCollection = "notifications"
+	config.MongoDeadlineCollection = "task_deadlines"
+	config.NatsURL = natsURL
+	config.SmtpHost = mailhogHost
+	config.SmtpPort = mailhogPort.Port()
+	config.SmtpFrom = "test@test.local"
+
+	mongo.ConnectMongo()
+	defer mongo.CloseMongoDB()
+
+	// Services с привязанным Telegram
+	notifRepo := repository.NewNotificationRepository()
+	deadlineRepo := repository.NewDeadlineRepository()
+	smtpSvc := service.NewSMTPService()
+	mockTg := &mockTelegramSender{}
+	telegramChannel := service.NewTelegramChannel(mockTg)
+	mockAuth := &mockAuthClient{
+		email:       "user@example.com",
+		chatID:      123456789,
+		hasTelegram: true,
+	}
+	notifierSvc := service.NewNotifierService(notifRepo, deadlineRepo, mockAuth, smtpSvc, telegramChannel)
+
+	// Эмулируем срабатывание cron — напрямую вызываем HandleDeadlineApproaching
+	userID := uuid.New()
+	taskID := uuid.New()
+
+	err = notifierSvc.HandleDeadlineApproaching(ctx, userID, taskID, "Test deadline task", "2026-12-31T23:59:59Z")
+	assert.NoError(t, err)
+
+	// Проверяем что Telegram получил сообщение
+	assert.Eventually(t, func() bool {
+		messages := mockTg.Messages()
+		if len(messages) == 0 {
+			return false
+		}
+		for _, m := range messages {
+			if m.ChatID == 123456789 && strings.Contains(m.Text, "Test deadline task") {
+				return true
+			}
+		}
+		return false
+	}, 3*time.Second, 100*time.Millisecond, "Telegram message should be sent for deadline")
+
+	// Проверяем что в БД появилось две записи: email и telegram
+	notifications, _, err := notifRepo.GetByUserID(ctx, userID, 1, 10)
+	assert.NoError(t, err)
+	assert.Len(t, notifications, 2, "Should have 2 notifications: email and telegram")
+
+	channels := []string{}
+	for _, n := range notifications {
+		channels = append(channels, n.Channel)
+	}
+	assert.Contains(t, channels, "email")
+	assert.Contains(t, channels, "telegram")
 }

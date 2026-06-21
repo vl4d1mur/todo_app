@@ -16,17 +16,18 @@ func getEnv(key, defaultValue string) string {
 }
 
 var (
-	ServerPort        string
-	MongoUri          string
-	MongoDbName       string
-	MongoDbCollection string
+	ServerPort              string
+	MongoUri                string
+	MongoDbName             string
+	MongoDbCollection       string
 	MongoDeadlineCollection string
-	NatsURL           string
-	AuthGrpcAddr      string
-	SmtpHost          string
-	SmtpPort          string
-	SmtpFrom          string
-	AppEnv            string
+	NatsURL                 string
+	AuthGrpcAddr            string
+	SmtpHost                string
+	SmtpPort                string
+	SmtpFrom                string
+	TelegramBotToken        string
+	AppEnv                  string
 )
 
 func LoadConfig() {
@@ -44,6 +45,7 @@ func LoadConfig() {
 	SmtpHost = getEnv("SMTP_HOST", "0.0.0.0")
 	SmtpPort = getEnv("SMTP_PORT", "1025")
 	SmtpFrom = getEnv("SMTP_FROM", "noreply@todo.local")
+	TelegramBotToken = getEnv("TELEGRAM_BOT_TOKEN", "")
 	AppEnv = getEnv("APP_ENV", "development")
 
 	log.Logger.Info().Msg("Config loaded")
