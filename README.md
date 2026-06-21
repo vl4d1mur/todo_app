@@ -33,6 +33,7 @@ graph TB
         Notifier[notifier_service<br/>HTTP :8092]
         MongoNotif[(mongo)]
         MailHog[mailhog<br/>SMTP :1025]
+        TgBot[Telegram Bot API]
     end
 
     subgraph Broker[Event Broker]
@@ -56,6 +57,7 @@ graph TB
     Notifier --> MongoNotif
     Notifier -.->|GetUserEmail| Auth
     Notifier -->|SMTP| MailHog
+    Notifier -->|HTTPS| TgBot
     NATS -->|subscribe task-events| Notifier
 ```
 
@@ -102,6 +104,46 @@ sequenceDiagram
     else email failed
         SMTP-->>Notifier: error
         Notifier->>MongoN: UPDATE status = failed
+    end
+```
+
+### Sequence — уведомление о приближении дедлайна
+
+```mermaid
+sequenceDiagram
+    actor Client
+    participant Task as task_service
+    participant NATS
+    participant Notifier as notifier_service
+    participant MongoN as mongo (notifier)
+    participant Auth as auth_service
+    participant SMTP as mailhog
+
+    Note over Client,Task: При создании или изменении задачи
+    Client->>Task: POST/PATCH /api/tasks
+    Task->>NATS: publish task.created / task.updated<br/>{title, deadline}
+    NATS->>Notifier: event received
+    Notifier->>MongoN: UPSERT task_deadlines
+
+    Note over Notifier: Каждый час cron проверяет<br/>приближающиеся дедлайны
+
+    loop Every hour
+        Notifier->>MongoN: SELECT deadlines<br/>WHERE deadline < now + 24h<br/>AND notified = false
+        MongoN-->>Notifier: pending deadlines
+
+        loop For each deadline
+        Notifier->>Auth: gRPC GetUserContacts
+        Auth-->>Notifier: email, chat_id, has_telegram
+            
+        par Send email
+        Notifier->>SMTP: send email
+        and Send telegram (if linked)
+        Notifier->>TgBot: send message
+        end
+            SMTP-->>Notifier: ok
+            Notifier->>MongoN: UPDATE notification status = sent
+            Notifier->>MongoN: UPDATE deadline notified = true
+        end
     end
 ```
 
@@ -257,6 +299,31 @@ curl http://localhost:8080/readyz/tasks
 curl http://localhost:8080/healthz/notifier
 curl http://localhost:8080/readyz/notifier
 ```
+## CI/CD
+
+Pipeline в GitHub Actions запускается на push и PR в `main`:
+
+- **Lint** — golangci-lint для каждого сервиса
+- **Unit-тесты** — `go test`
+- **Integration-тесты** — с testcontainers (поднимает Postgres, Redis, MongoDB, NATS, MailHog)
+- **Docker build** — проверка что Dockerfile собираются
+
+Все 4 типа job выполняются параллельно через matrix strategy для всех трёх сервисов.
+
+## Telegram интеграция
+
+Notifier поддерживает доставку уведомлений о дедлайнах через Telegram бота.
+
+### Привязка пользователя
+
+1. Получить код привязки:
+```bash
+   curl -X POST http://localhost:8080/api/profile/telegram/code \
+     -H "Authorization: Bearer <TOKEN>"
+```
+2. Открыть своего бота в Telegram, отправить: /start (code)
+3. Бот ответит подтверждением, после чего уведомления о приближении дедлайнов начнут приходить в Telegram.
+Уведомления о смене статуса по-прежнему идут только в email.
 
 ## Выбор библиотек
 
@@ -287,8 +354,6 @@ curl http://localhost:8080/readyz/notifier
 
 ### Запланировано
 
-- **Отдельная БД для дедлайнов в notifier_service [WIP]** — копировать дедлайны при `task.created`/`task.updated`, чтобы notifier стал полностью независим от task_service. Cron переедет из task_service в notifier.
-- **Telegram бот для уведомлений [WIP]** — альтернативный канал доставки помимо email.
 - **Observability через Prometheus + Grafana [WIP]** — метрики каждого сервиса и дашборды.
 
 ### Технический долг
@@ -300,4 +365,3 @@ curl http://localhost:8080/readyz/notifier
 
 - **go.uber.org/fx** для DI — убрать ручное создание зависимостей в `main.go`.
 - **NATS JetStream** — at-least-once доставка с персистентностью сообщений.
-- **CI/CD pipeline** — автоматический запуск тестов через GitHub Actions. [WIP]
