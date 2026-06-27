@@ -352,7 +352,7 @@ Notifier поддерживает доставку уведомлений о д�
 
 ## Observability
 
-В проекте настроены метрики через Prometheus + Grafana.
+В проекте настроены метрики через Prometheus + Grafana. Dashboard [WIP]
 
 ### Доступы
 
