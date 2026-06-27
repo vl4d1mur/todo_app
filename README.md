@@ -6,7 +6,7 @@ REST API приложение для управления задачами и з
 
 Проект состоит из трёх сервисов: `auth_service`, `task_service`, `notifier_service`. Каждый имеет свою БД, общая инфраструктура — NATS как шина событий и MailHog для SMTP.
 
-### Компонентная диаграмма
+### Диаграмма компонентов
 
 ```mermaid
 graph TB
@@ -300,6 +300,30 @@ curl http://localhost:8080/readyz/tasks
 curl http://localhost:8080/healthz/notifier
 curl http://localhost:8080/readyz/notifier
 ```
+
+## Кэширование
+
+### auth_service (redis-auth)
+
+**Что кэшируется:**
+- Профиль пользователя по `user_id` — TTL 1 час
+- Коды привязки Telegram — TTL 10 минут (по истечении удаляются автоматически)
+- JWT blacklist — TTL равен оставшемуся времени жизни токена
+
+**Инвалидация:**
+- Профиль — при обновлении пользователя (write-through)
+- Telegram коды — после успешной активации удаляются
+- Blacklist — автоматически по TTL
+
+### task_service (redis-tasks)
+
+**Что кэшируется:**
+- Список задач пользователя по `user_id` — TTL 5 минут
+
+**Инвалидация:**
+- При любой операции изменения (create, update, delete задачи или заметки) кэш списка задач пользователя удаляется. При следующем запросе данные подтянутся из Postgres и закэшируются заново.
+
+
 ## CI/CD
 
 Pipeline в GitHub Actions запускается на push и PR в `main`:
@@ -325,6 +349,52 @@ Notifier поддерживает доставку уведомлений о д�
 2. Открыть своего бота в Telegram, отправить: /start (code)
 3. Бот ответит подтверждением, после чего уведомления о приближении дедлайнов начнут приходить в Telegram.
 Уведомления о смене статуса по-прежнему идут только в email.
+
+## Observability
+
+В проекте настроены метрики через Prometheus + Grafana.
+
+### Доступы
+
+- Prometheus UI: `http://localhost:9090`
+- Grafana: `http://localhost:3000` (login: `admin`, password: `admin`)
+
+### Что собирается
+
+Каждый сервис экспортирует метрики на эндпоинте `/metrics`:
+
+**Технические (везде):**
+- `http_requests_total{method, path, status}` — счётчик запросов
+- `http_request_duration_seconds` — гистограмма latency
+
+**auth_service:**
+- `auth_users_registered_total`, `auth_users_login_total`, `auth_jwt_refresh_total`, `auth_logouts_total`
+- `auth_login_failures_total{reason}` — с разбивкой по причине
+- `auth_telegram_codes_generated_total`, `auth_telegram_activations_total`
+
+**task_service:**
+- `tasks_created_total`, `tasks_updated_total`, `tasks_deleted_total`
+- `tasks_status_changed_total{new_status}` — с лейблом статуса
+- `tasks_cache_hits_total`, `tasks_cache_misses_total` — эффективность Redis
+- `tasks_events_published_total{event_type}` — события в NATS
+- `tasks_notes_created_total`, `tasks_notes_deleted_total`
+
+**notifier_service:**
+- `notifier_notifications_sent_total{channel, event_type}` — доставка по каналам
+- `notifier_notifications_failed_total{channel, event_type}` — неудачные отправки
+- `notifier_events_received_total{event_type}` — события из NATS
+- `notifier_deadline_checks_total`, `notifier_deadline_notifications_sent_total` — работа cron
+
+### Load tester
+
+В папке `load-tester/` лежит генератор ботов для проверки метрик:
+
+```bash
+cd load-tester
+go run . -bots=10
+```
+
+Параметр `-bots` задаёт количество ботов которые регистрируются и выполняют случайные действия (создание задач, заметок, смена статусов, refresh токенов).
 
 ## Выбор библиотек
 
@@ -355,12 +425,11 @@ Notifier поддерживает доставку уведомлений о д�
 
 ### Запланировано
 
-- **Observability через Prometheus + Grafana [WIP]** — метрики каждого сервиса и дашборды.
+- **я обязательно что-нибудь придумаю** — 
 
 ### Технический долг
 
 - **Пагинация в task_service через SQL** — сейчас фильтрация и нарезка списка задач происходит в памяти Go(так вышло). Перевести на `LIMIT/OFFSET` для масштабируемости.
-- **JWT blacklist через Redis** — инвалидация access токенов при logout. Архитектура для этого уже подготовлена. [WIP]
 
 ### Альтернативные библиотеки на будущее
 
