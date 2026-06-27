@@ -9,6 +9,7 @@ import (
 	"task_service/internal/events"
 	"task_service/internal/models"
 	"task_service/internal/repository"
+	"task_service/pkg/metrics"
 
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -40,7 +41,7 @@ func (s *NoteService) CreateNote(ctx context.Context, taskID, userID uuid.UUID, 
 	}
 
 	events.PublishNoteAdded(taskID, userID, note.ID.Hex(), note.Text)
-
+	metrics.NotesCreated.Inc()
 	return &note, nil
 }
 
@@ -49,6 +50,7 @@ func (s *NoteService) DeleteNote(ctx context.Context, noteID bson.ObjectID, user
 		return err
 	}
 
+	metrics.NotesDeleted.Inc()
 	return nil
 }
 

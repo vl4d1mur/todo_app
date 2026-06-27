@@ -6,6 +6,7 @@ tmp/
 auth_service/tests/
 task_service/tests/
 task_service/cmd/consumer/
+load_tester/
 config/
 *.zip
 .env

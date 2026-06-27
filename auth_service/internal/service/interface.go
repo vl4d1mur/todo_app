@@ -14,7 +14,7 @@ type AuthServiceInterface interface {
 	Login(ctx context.Context, req dto.LoginRequest) (*dto.TokenPair, error)
 	GetProfile(ctx context.Context, userID uuid.UUID) (*models.User, error)
 	RefreshToken(ctx context.Context, refreshToken string) (*dto.TokenPair, error)
-	Logout(ctx context.Context, refreshToken string) error
+	Logout(ctx context.Context, refreshToken, accessToken string) error
 }
 
 type TelegramServiceInterface interface {

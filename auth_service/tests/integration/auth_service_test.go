@@ -142,7 +142,7 @@ func TestAuthService_FullFlow(t *testing.T) {
 
 	// ==================== 8. LOGOUT ====================
 
-	err = authSvc.Logout(ctx, newTokens.RefreshToken)
+	err = authSvc.Logout(ctx, newTokens.RefreshToken, newTokens.AccessToken)
 	assert.NoError(t, err)
 
 	// ==================== 9. SESSION SHOULD BE DELETED ====================

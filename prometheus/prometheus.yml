@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'auth_service'
+    static_configs:
+      - targets: ['auth_service:8091']
+
+  - job_name: 'task_service'
+    static_configs:
+      - targets: ['task_service:8090']
+
+  - job_name: 'notifier_service'
+    static_configs:
+      - targets: ['notifier_service:8092']

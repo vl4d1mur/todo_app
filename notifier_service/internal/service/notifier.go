@@ -8,6 +8,7 @@ import (
 	"notifier_service/internal/models"
 	"notifier_service/internal/repository"
 	"notifier_service/pkg/log"
+	"notifier_service/pkg/metrics"
 	"notifier_service/pkg/pagination"
 
 	"github.com/google/uuid"
@@ -69,7 +70,8 @@ func (s *NotifierService) sendEmail(
 	if err := s.repo.UpdateStatus(ctx, notification.ID.Hex(), models.StatusSent, ""); err != nil {
 		log.Logger.Error().Err(err).Msg("Failed to update notification status to sent")
 	}
-	_ = time.Now()
+
+	metrics.NotificationsSent.WithLabelValues("email", eventType).Inc()
 	return nil
 }
 
@@ -96,6 +98,7 @@ func (s *NotifierService) sendTelegram(ctx context.Context, userID, taskID uuid.
 		}
 	}
 
+	metrics.NotificationsSent.WithLabelValues("telegram", eventType).Inc()
 	return s.repo.UpdateStatus(ctx, notification.ID.Hex(), models.StatusSent, "")
 }
 

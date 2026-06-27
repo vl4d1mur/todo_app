@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"auth_service/internal/dto"
 	"auth_service/internal/middleware"
@@ -121,7 +122,10 @@ func (h *AuthHandler) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.service.Logout(r.Context(), req.RefreshToken); err != nil {
+	authHeader := r.Header.Get("Authorization")
+	accessToken := strings.TrimPrefix(authHeader, "Bearer ")
+
+	if err := h.service.Logout(r.Context(), req.RefreshToken, accessToken); err != nil {
 		if errors.Is(err, service.ErrInvalidSession) {
 			middleware.RespondWithError(w, http.StatusUnauthorized, "Invalid or expired refresh token")
 		} else {

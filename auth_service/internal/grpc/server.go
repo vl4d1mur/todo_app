@@ -6,6 +6,8 @@ import (
 	"auth_service/internal/db/redisConn"
 	"auth_service/internal/repository"
 	"auth_service/pkg/jwt"
+	"auth_service/pkg/log"
+	"auth_service/pkg/metrics"
 	"auth_service/pkg/pb"
 
 	"github.com/google/uuid"
@@ -28,6 +30,16 @@ func (s *AuthServer) ValidateToken(ctx context.Context, req *pb.ValidateTokenReq
 			Error: err.Error(),
 		}, nil
 	}
+
+    blacklisted, err := redisConn.IsBlacklisted(claims.ID)
+    if err != nil {
+        log.Logger.Warn().Err(err).Msg("Failed to check blacklist")
+    } else if blacklisted {
+        return &pb.ValidateTokenResponse{
+            Valid: false,
+            Error: "token is blacklisted",
+        }, nil
+    }
 
 	return &pb.ValidateTokenResponse{
 		Valid:  true,
@@ -61,6 +73,7 @@ func (s *AuthServer) ActivateTelegram(ctx context.Context, req *pb.ActivateTeleg
 
 	_ = redisConn.DeleteTelegramCode(req.Code)
 
+	metrics.TelegramActivations.Inc()
 	return &pb.ActivateTelegramResponse{Success: true}, nil
 }
 

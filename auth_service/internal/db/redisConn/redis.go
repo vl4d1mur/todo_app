@@ -97,6 +97,29 @@ func InvalidateUserProfile(userID string) error {
 	return DeleteCache(UserProfileKey(userID))
 }
 
+func BlacklistKey(jti string) string {
+	return "blacklist" + jti
+}
+
+func BlacklistToken(jti string, ttl time.Duration) error {
+	if RedisClient == nil {
+		return nil
+	}
+
+	return RedisClient.Set(context.Background(), BlacklistKey(jti), "1", ttl).Err()
+}
+
+func IsBlacklisted(jti string) (bool, error) {
+	if RedisClient == nil {
+		return false, nil
+	}
+	n, err := RedisClient.Exists(context.Background(), BlacklistKey(jti)).Result()
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}
+
 //telegram
 
 func TelegramCodeKey(code string) string {

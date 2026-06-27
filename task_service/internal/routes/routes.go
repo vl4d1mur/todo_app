@@ -7,14 +7,18 @@ import (
 	"task_service/internal/handlers"
 	"task_service/internal/health"
 	"task_service/internal/middleware"
+	"task_service/pkg/metrics"
 )
 
 func SetupRoutes(h *handlers.Handler, health *health.Checker, authClient *authgrpc.AuthClient) *mux.Router {
 	r := mux.NewRouter()
 	r.Use(middleware.Logger)
+	r.Use(metrics.Middleware)
 
 	r.HandleFunc("/healthz", health.Liveness).Methods("GET")
 	r.HandleFunc("/readyz", health.Readiness).Methods("GET")
+
+	r.Handle("/metrics", metrics.Handler()).Methods("GET")
 
 	api := r.PathPrefix("/api").Subrouter()
 	api.Use(middleware.AuthMiddleware(authClient))

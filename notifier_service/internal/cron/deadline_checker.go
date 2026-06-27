@@ -7,6 +7,7 @@ import (
 	"notifier_service/internal/repository"
 	"notifier_service/internal/service"
 	"notifier_service/pkg/log"
+	"notifier_service/pkg/metrics"
 )
 
 type DeadlineChecker struct {
@@ -54,6 +55,7 @@ func (d *DeadlineChecker) Stop() {
 }
 
 func (d *DeadlineChecker) check() {
+	metrics.DeadlineChecks.Inc()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -85,6 +87,8 @@ func (d *DeadlineChecker) check() {
 
 		if err := d.repo.MarkNotified(ctx, deadline.TaskID); err != nil {
 			log.Logger.Error().Err(err).Str("task_id", deadline.TaskID.String()).Msg("Failed to mark deadline notified")
+		} else {
+			metrics.DeadlineNotificationsSent.Inc()
 		}
 	}
 }

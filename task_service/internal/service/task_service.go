@@ -12,6 +12,7 @@ import (
 	"task_service/internal/models"
 	"task_service/internal/repository"
 	"task_service/pkg/log"
+	"task_service/pkg/metrics"
 	"task_service/pkg/pagination"
 
 	"github.com/google/uuid"
@@ -58,6 +59,7 @@ func (s *TaskService) CreateTask(ctx context.Context, userID uuid.UUID, req dto.
 	}
 	events.PublishTaskCreated(task.ID, task.UserID, task.Title, task.DeadLine)
 
+	metrics.TasksCreated.Inc()
 	return &task, nil
 }
 
@@ -80,10 +82,12 @@ func (s *TaskService) UpdateTask(ctx context.Context, taskID, userID uuid.UUID, 
 	}
 
 	if req.Status != nil {
+		metrics.TaskStatusChanged.WithLabelValues(string(*req.Status)).Inc()
 		events.PublishTaskStatusChanged(taskID, userID, string(*req.Status), task.Title)
 	}
 	events.PublishTaskUpdated(taskID, userID, task.Title, task.DeadLine)
 
+	metrics.TasksUpdated.Inc()
 	return task, nil
 }
 
@@ -100,7 +104,7 @@ func (s *TaskService) DeleteTask(ctx context.Context, taskID, userID uuid.UUID) 
 		log.Logger.Warn().Err(err).Msg("Failed to invalidate tasks cache")
 	}
 	events.PublishTaskDeleted(taskID, userID)
-
+	metrics.TasksDeleted.Inc()
 	return nil
 }
 
@@ -120,6 +124,7 @@ func (s *TaskService) GetAllByUser(ctx context.Context, userID uuid.UUID, q pagi
 
 	allTasks, err := redisConn.GetCachedTasksList(userID.String())
 	if err != nil {
+		metrics.CacheMisses.Inc()
 		allTasks, err = s.repo.GetAllByUser(ctx, userID)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to get tasks: %w", err)
@@ -127,6 +132,8 @@ func (s *TaskService) GetAllByUser(ctx context.Context, userID uuid.UUID, q pagi
 		if err := redisConn.CacheTasksList(userID.String(), allTasks); err != nil {
 			log.Logger.Warn().Err(err).Msg("Failed to cache tasks list")
 		}
+	} else {
+		metrics.CacheHits.Inc()
 	}
 
 	if q.Status != "" {

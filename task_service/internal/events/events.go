@@ -6,6 +6,7 @@ import (
 
 	"task_service/internal/config"
 	"task_service/pkg/log"
+	"task_service/pkg/metrics"
 
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
@@ -128,7 +129,8 @@ func publishTaskEvent(eventType string, taskID, userID uuid.UUID, payload any) {
 		log.Logger.Error().Err(err).Msg("NATS publish error:")
 		return
 	}
-
+	
+	metrics.EventsPublished.WithLabelValues(eventType).Inc()
 	log.Logger.Info().
 		Str("event_type", eventType).
 		Str("task_id", taskID.String()).

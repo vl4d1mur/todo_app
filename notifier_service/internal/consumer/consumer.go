@@ -9,6 +9,7 @@ import (
 	"notifier_service/internal/models"
 	"notifier_service/internal/service"
 	"notifier_service/pkg/log"
+	"notifier_service/pkg/metrics"
 
 	"github.com/nats-io/nats.go"
 )
@@ -49,6 +50,8 @@ func (c *Consumer) handleMessage(msg *nats.Msg) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	metrics.EventsReceived.WithLabelValues(event.EventType).Inc()
 
 	switch event.EventType {
 	case "task.status_changed":

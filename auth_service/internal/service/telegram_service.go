@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"auth_service/internal/db/redisConn"
+	"auth_service/pkg/metrics"
 
 	"github.com/google/uuid"
 )
@@ -26,6 +27,7 @@ func (s *TelegramService) GenerateTelegramCode(ctx context.Context, userID uuid.
 		return "", fmt.Errorf("failed to save code: %w", err)
 	}
 
+	metrics.TelegramCodesGenerated.Inc()
 	return code, err
 }
 

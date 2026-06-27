@@ -13,6 +13,7 @@ import (
 	"auth_service/pkg/hash"
 	"auth_service/pkg/jwt"
 	"auth_service/pkg/log"
+	"auth_service/pkg/metrics"
 
 	"github.com/google/uuid"
 )
@@ -63,6 +64,7 @@ func (s *AuthService) Register(ctx context.Context, req dto.RegisterRequest) (*m
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
+	metrics.UsersRegistered.Inc()
 	return user, nil
 }
 
@@ -84,16 +86,30 @@ func (s *AuthService) Login(ctx context.Context, req dto.LoginRequest) (*dto.Tok
 		return nil, err
 	}
 
+	metrics.UsersLoggedIn.Inc()
 	return tokens, nil
 }
 
-func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
+func (s *AuthService) Logout(ctx context.Context, refreshToken string, accessToken string) error {
 	if err := s.sessionRepo.DeleteSessionByToken(ctx, refreshToken); err != nil {
 		if errors.Is(err, repository.ErrSessionNotFound) {
 			return ErrInvalidSession
 		}
 		return fmt.Errorf("failed to delete session: %w", err)
 	}
+	if accessToken != "" {
+    	claims, err := jwt.ParseAccess(accessToken)
+    	if err == nil {
+            ttl := time.Until(claims.ExpiresAt.Time)
+            if ttl > 0 {
+                if err := redisConn.BlacklistToken(claims.ID, ttl); err != nil {
+                    log.Logger.Warn().Err(err).Msg("Failed to blacklist access token")
+                }
+            }
+        }
+    }
+
+	metrics.Logouts.Inc()
 	return nil
 }
 
@@ -142,6 +158,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*d
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 
+	metrics.JWTRefresh.Inc()
 	return s.createTokenPair(ctx, user)
 }
 

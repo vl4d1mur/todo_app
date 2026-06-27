@@ -6,15 +6,17 @@ import (
 	"auth_service/internal/handlers"
 	"auth_service/internal/health"
 	"auth_service/internal/middleware"
+	"auth_service/pkg/metrics"
 )
 
 func SetupRoutes(h *handlers.Handler, health *health.Checker) *mux.Router {
 	r := mux.NewRouter()
 	r.Use(middleware.Logger)
+	r.Use(metrics.Middleware)
 
 	r.HandleFunc("/healthz", health.Liveness).Methods("GET")
 	r.HandleFunc("/readyz", health.Readiness).Methods("GET")
-
+	r.Handle("/metrics", metrics.Handler()).Methods("GET")
 	r.HandleFunc("/api/register", h.Auth.RegisterHandler).Methods("POST")
 	r.HandleFunc("/api/login", h.Auth.LoginHandler).Methods("POST")
 	r.HandleFunc("/api/refresh", h.Auth.RefreshHandler).Methods("POST")

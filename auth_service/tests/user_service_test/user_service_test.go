@@ -181,7 +181,7 @@ func TestLogout_Success(t *testing.T) {
 		&mockSessionRepo{},
 	)
 
-	err := svc.Logout(context.Background(), "some-refresh-token")
+	err := svc.Logout(context.Background(), "some-refresh-token", "some-access-token")
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -193,7 +193,7 @@ func TestLogout_InvalidSession(t *testing.T) {
 		&mockSessionRepo{deleteErr: repository.ErrSessionNotFound},
 	)
 
-	err := svc.Logout(context.Background(), "invalid-token")
+	err := svc.Logout(context.Background(), "invalid-token", "")
 	if !errors.Is(err, service.ErrInvalidSession) {
 		t.Errorf("Expected ErrInvalidSession, got %v", err)
 	}
