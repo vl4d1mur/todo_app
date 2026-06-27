@@ -31,15 +31,15 @@ func (s *AuthServer) ValidateToken(ctx context.Context, req *pb.ValidateTokenReq
 		}, nil
 	}
 
-    blacklisted, err := redisConn.IsBlacklisted(claims.ID)
-    if err != nil {
-        log.Logger.Warn().Err(err).Msg("Failed to check blacklist")
-    } else if blacklisted {
-        return &pb.ValidateTokenResponse{
-            Valid: false,
-            Error: "token is blacklisted",
-        }, nil
-    }
+	blacklisted, err := redisConn.IsBlacklisted(claims.ID)
+	if err != nil {
+		log.Logger.Warn().Err(err).Msg("Failed to check blacklist")
+	} else if blacklisted {
+		return &pb.ValidateTokenResponse{
+			Valid: false,
+			Error: "token is blacklisted",
+		}, nil
+	}
 
 	return &pb.ValidateTokenResponse{
 		Valid:  true,

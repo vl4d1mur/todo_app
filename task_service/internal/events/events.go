@@ -129,7 +129,7 @@ func publishTaskEvent(eventType string, taskID, userID uuid.UUID, payload any) {
 		log.Logger.Error().Err(err).Msg("NATS publish error:")
 		return
 	}
-	
+
 	metrics.EventsPublished.WithLabelValues(eventType).Inc()
 	log.Logger.Info().
 		Str("event_type", eventType).

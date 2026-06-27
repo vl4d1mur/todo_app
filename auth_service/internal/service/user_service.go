@@ -98,16 +98,16 @@ func (s *AuthService) Logout(ctx context.Context, refreshToken string, accessTok
 		return fmt.Errorf("failed to delete session: %w", err)
 	}
 	if accessToken != "" {
-    	claims, err := jwt.ParseAccess(accessToken)
-    	if err == nil {
-            ttl := time.Until(claims.ExpiresAt.Time)
-            if ttl > 0 {
-                if err := redisConn.BlacklistToken(claims.ID, ttl); err != nil {
-                    log.Logger.Warn().Err(err).Msg("Failed to blacklist access token")
-                }
-            }
-        }
-    }
+		claims, err := jwt.ParseAccess(accessToken)
+		if err == nil {
+			ttl := time.Until(claims.ExpiresAt.Time)
+			if ttl > 0 {
+				if err := redisConn.BlacklistToken(claims.ID, ttl); err != nil {
+					log.Logger.Warn().Err(err).Msg("Failed to blacklist access token")
+				}
+			}
+		}
+	}
 
 	metrics.Logouts.Inc()
 	return nil

@@ -189,6 +189,13 @@ services:
       - "9090:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      auth_service:
+        condition: service_started
+      task_service:
+        condition: service_started
+      notifier_service:
+        condition: service_started
     restart: unless-stopped
 
   grafana:
@@ -202,9 +209,10 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_started
     restart: unless-stopped
-
+    
 volumes:
   postgres_auth_data:
   postgres_tasks_data:
